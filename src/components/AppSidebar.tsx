@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { Anchor, LayoutDashboard, BookOpen, Users, MapPin, Timer, GraduationCap, Ship, UserCheck, FileText, AlertTriangle, Home, LogOut } from "lucide-react";
+import { Anchor, LayoutDashboard, BookOpen, Users, MapPin, GraduationCap, Ship, UserCheck, FileText, AlertTriangle, Home, LogOut } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 
@@ -8,7 +8,6 @@ const links = [
   { to: "/dive-logs", label: "Dive Logs", icon: BookOpen },
   { to: "/divers", label: "Divers", icon: Users },
   { to: "/dive-sites", label: "Dive Sites", icon: MapPin },
-  { to: "/dive-timer", label: "Dive Timer", icon: Timer },
   { to: "/instructors", label: "Instructors", icon: UserCheck },
   { to: "/boats", label: "Boats", icon: Ship },
   { to: "/courses", label: "Courses", icon: GraduationCap },

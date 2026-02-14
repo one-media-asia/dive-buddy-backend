@@ -11,7 +11,6 @@ import DashboardPage from "@/pages/DashboardPage";
 import DiveLogsPage from "@/pages/DiveLogsPage";
 import DiversPage from "@/pages/DiversPage";
 import DiveSitesPage from "@/pages/DiveSitesPage";
-import DiveTimerPage from "@/pages/DiveTimerPage";
 import InstructorsPage from "@/pages/InstructorsPage";
 import BoatsPage from "@/pages/BoatsPage";
 import CoursesPage from "@/pages/CoursesPage";
@@ -45,7 +44,6 @@ function ProtectedRoutes() {
         <Route path="/dive-logs" element={<DiveLogsPage />} />
         <Route path="/divers" element={<DiversPage />} />
         <Route path="/dive-sites" element={<DiveSitesPage />} />
-        <Route path="/dive-timer" element={<DiveTimerPage />} />
         <Route path="/instructors" element={<InstructorsPage />} />
         <Route path="/boats" element={<BoatsPage />} />
         <Route path="/courses" element={<CoursesPage />} />
