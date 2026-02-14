@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Trash2, Edit2, CheckCircle, Clock } from "lucide-react";
+import { Plus, Trash2, Edit2, CheckCircle, Clock, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -118,7 +118,7 @@ export default function DiversPage() {
       <div className="page-header flex items-center justify-between">
         <div>
           <h1 className="page-title">Divers</h1>
-          <p className="page-description">Manage diver profiles, certifications, and waivers</p>
+          <p className="page-description">Manage diver profiles, certifications, and medical forms</p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
@@ -209,17 +209,16 @@ export default function DiversPage() {
                 </span>
               </div>
 
-              {/* Waiver Status */}
-              <div className="flex items-center gap-2 text-sm">
-                {diver.waiver_signed ? (
-                  <CheckCircle className="h-4 w-4 text-success" />
-                ) : (
-                  <Clock className="h-4 w-4 text-warning" />
-                )}
-                <span className="text-muted-foreground">
-                  {diver.waiver_signed ? `Waiver signed (${new Date(diver.waiver_signed_date).toLocaleDateString()})` : "Waiver pending"}
-                </span>
-              </div>
+              {/* PADI Medical Form Download */}
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full mt-2"
+                onClick={() => window.open('https://www.padi.com/forms', '_blank')}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Download PADI Medical Form
+              </Button>
 
               {/* Onboarding Status */}
               <div className="flex items-center gap-2 text-sm">

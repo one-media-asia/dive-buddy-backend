@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Users, FileText, CheckCircle, AlertCircle } from "lucide-react";
+import { Users, ClipboardCheck, CheckCircle, AlertCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
@@ -9,8 +9,8 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const [stats, setStats] = useState({
     totalDivers: 0,
-    waiversSigned: 0,
-    waiversPending: 0,
+    medicalCleared: 0,
+    medicalPending: 0,
     onboardingCompleted: 0,
     onboardingPending: 0,
     upcomingBookings: 0,
@@ -21,18 +21,17 @@ export default function DashboardPage() {
     (async () => {
       try {
         const divers = await apiClient.divers.list();
-        const waivers = await apiClient.waivers.list();
 
         const totalDivers = divers.length;
-        const waiversSigned = divers.filter((d: any) => d.waiver_signed).length;
-        const waiversPending = totalDivers - waiversSigned;
+        const medicalCleared = divers.filter((d: any) => d.medical_cleared).length;
+        const medicalPending = totalDivers - medicalCleared;
         const onboardingCompleted = divers.filter((d: any) => d.onboarding_completed).length;
         const onboardingPending = totalDivers - onboardingCompleted;
 
         setStats({
           totalDivers,
-          waiversSigned,
-          waiversPending,
+          medicalCleared,
+          medicalPending,
           onboardingCompleted,
           onboardingPending,
           upcomingBookings: 0,
@@ -73,13 +72,13 @@ export default function DashboardPage() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              Waivers Signed
+              <ClipboardCheck className="h-4 w-4" />
+              Medical Cleared
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-success">{stats.waiversSigned}</div>
-            <p className="text-xs text-muted-foreground mt-1">{stats.waiversPending} pending</p>
+            <div className="text-3xl font-bold text-success">{stats.medicalCleared}</div>
+            <p className="text-xs text-muted-foreground mt-1">{stats.medicalPending} pending</p>
           </CardContent>
         </Card>
 
@@ -104,7 +103,7 @@ export default function DashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-warning">{stats.waiversPending + stats.onboardingPending}</div>
+            <div className="text-3xl font-bold text-warning">{stats.medicalPending + stats.onboardingPending}</div>
             <p className="text-xs text-muted-foreground mt-1">Require attention</p>
           </CardContent>
         </Card>
@@ -112,30 +111,30 @@ export default function DashboardPage() {
 
       {/* Action Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        {/* Waivers */}
+        {/* Medical Clearance */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5 text-primary" />
-              Digital Waivers
+              <ClipboardCheck className="h-5 w-5 text-primary" />
+              Medical Clearance
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
               <p className="text-sm text-muted-foreground mb-2">
-                {stats.waiversPending === 0
-                  ? "All waivers are signed!"
-                  : `${stats.waiversPending} diver${stats.waiversPending !== 1 ? "s" : ""} need to sign waivers`}
+                {stats.medicalPending === 0
+                  ? "All divers medically cleared!"
+                  : `${stats.medicalPending} diver${stats.medicalPending !== 1 ? "s" : ""} need medical clearance`}
               </p>
               <div className="w-full bg-muted rounded-full h-2">
                 <div
                   className="bg-success h-2 rounded-full transition-all"
-                  style={{ width: `${stats.totalDivers ? (stats.waiversSigned / stats.totalDivers) * 100 : 0}%` }}
+                  style={{ width: `${stats.totalDivers ? (stats.medicalCleared / stats.totalDivers) * 100 : 0}%` }}
                 />
               </div>
             </div>
-            <Button onClick={() => navigate('/waivers')} className="w-full">
-              Manage Waivers
+            <Button onClick={() => navigate('/divers')} className="w-full">
+              View Divers
             </Button>
           </CardContent>
         </Card>
@@ -177,9 +176,6 @@ export default function DashboardPage() {
             <Button onClick={() => navigate('/divers')} variant="outline" className="w-full justify-start">
               Add New Diver
             </Button>
-            <Button onClick={() => navigate('/waivers')} variant="outline" className="w-full justify-start">
-              Sign Waiver
-            </Button>
             <Button onClick={() => navigate('/bookings')} variant="outline" className="w-full justify-start">
               Create Booking
             </Button>
@@ -203,11 +199,11 @@ export default function DashboardPage() {
               </span>
             </li>
             <li className="flex gap-3">
-              <span className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center font-bold text-white ${stats.waiversSigned > 0 ? 'bg-success' : 'bg-muted-foreground'}`}>
-                {stats.waiversSigned > 0 ? '✓' : '2'}
+              <span className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center font-bold text-white ${stats.medicalCleared > 0 ? 'bg-success' : 'bg-muted-foreground'}`}>
+                {stats.medicalCleared > 0 ? '✓' : '2'}
               </span>
               <span className="text-muted-foreground">
-                Have divers sign digital waivers
+                Verify medical clearance and download PADI medical forms
               </span>
             </li>
             <li className="flex gap-3">
