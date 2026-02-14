@@ -30,6 +30,7 @@ export default function POSPage() {
   const [cartOpen, setCartOpen] = useState(false);
   const [selectedDiverId, setSelectedDiverId] = useState("");
   const [selectedBookingId, setSelectedBookingId] = useState("");
+  const [bookingsList, setBookingsList] = useState<Array<{ id: string; label: string }>>([]);
   const [tax, setTax] = useState(0);
   const [discount, setDiscount] = useState(0);
   const [notes, setNotes] = useState("");
@@ -47,8 +48,24 @@ export default function POSPage() {
     loadEquipment();
     loadTransactions();
     loadPayments();
+    loadBookings();
     loadSummary();
   }, []);
+
+  const loadBookings = async () => {
+    try {
+      const res = await fetch("/api/bookings");
+      if (!res.ok) return;
+      const data = await res.json();
+      const items = (data || []).map((b: any) => {
+        const title = `${b.diver_name || "Unknown"} — ${b.course_name || b.group_name || b.booking_type || "booking"}${b.check_in ? ` (${new Date(b.check_in).toLocaleDateString()})` : ""}`;
+        return { id: b.id, label: title };
+      });
+      setBookingsList(items);
+    } catch (err) {
+      console.error("Failed to load bookings:", err);
+    }
+  };
 
   const loadEquipment = async () => {
     try {
@@ -323,7 +340,17 @@ export default function POSPage() {
                       </div>
                       <div>
                         <Label>Booking (Optional)</Label>
-                        <Input placeholder="Booking ID" value={selectedBookingId} onChange={(e) => setSelectedBookingId(e.target.value)} />
+                        <Select value={selectedBookingId} onValueChange={setSelectedBookingId}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="z-50 max-h-40 overflow-y-auto">
+                            <SelectItem value="">None</SelectItem>
+                            {bookingsList.map(b => (
+                              <SelectItem key={b.id} value={b.id}>{b.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                       <div className="grid grid-cols-3 gap-3">
                         <div>
