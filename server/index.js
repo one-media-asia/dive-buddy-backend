@@ -959,6 +959,287 @@ app.post('/api/groups/:id/itinerary', (req, res) => {
   });
 });
 
+// ========== EQUIPMENT / INVENTORY ENDPOINTS ==========
+
+// GET /api/equipment - list all equipment
+app.get('/api/equipment', (req, res) => {
+  const db = getDb();
+  db.all('SELECT * FROM equipment ORDER BY category, name', (err, equipment) => {
+    db.close();
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(equipment || []);
+  });
+});
+
+// GET /api/equipment/:id - get equipment by id
+app.get('/api/equipment/:id', (req, res) => {
+  const { id } = req.params;
+  const db = getDb();
+  db.get('SELECT * FROM equipment WHERE id = ?', [id], (err, equipment) => {
+    db.close();
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(equipment || {});
+  });
+});
+
+// POST /api/equipment - create new equipment
+app.post('/api/equipment', (req, res) => {
+  const { name, category, sku, price, quantity_in_stock, reorder_level, supplier, description, barcode } = req.body;
+  if (!name || !category) return res.status(400).json({ error: 'name and category required' });
+
+  const db = getDb();
+  const id = uuidv4();
+  db.run(
+    'INSERT INTO equipment (id, name, category, sku, price, quantity_in_stock, reorder_level, supplier, description, barcode) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [id, name, category, sku || null, price || 0, quantity_in_stock || 0, reorder_level || 5, supplier || null, description || null, barcode || null],
+    (err) => {
+      if (err) {
+        db.close();
+        return res.status(500).json({ error: err.message });
+      }
+      db.get('SELECT * FROM equipment WHERE id = ?', [id], (err, equipment) => {
+        db.close();
+        if (err) return res.status(500).json({ error: err.message });
+        res.status(201).json(equipment);
+      });
+    }
+  );
+});
+
+// PUT /api/equipment/:id - update equipment
+app.put('/api/equipment/:id', (req, res) => {
+  const { id } = req.params;
+  const { name, category, sku, price, quantity_in_stock, reorder_level, supplier, description, barcode } = req.body;
+
+  const db = getDb();
+  db.run(
+    'UPDATE equipment SET name = ?, category = ?, sku = ?, price = ?, quantity_in_stock = ?, reorder_level = ?, supplier = ?, description = ?, barcode = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+    [name, category, sku || null, price || 0, quantity_in_stock || 0, reorder_level || 5, supplier || null, description || null, barcode || null, id],
+    (err) => {
+      if (err) {
+        db.close();
+        return res.status(500).json({ error: err.message });
+      }
+      db.get('SELECT * FROM equipment WHERE id = ?', [id], (err, equipment) => {
+        db.close();
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(equipment);
+      });
+    }
+  );
+});
+
+// DELETE /api/equipment/:id - soft delete equipment
+app.delete('/api/equipment/:id', (req, res) => {
+  const { id } = req.params;
+  const db = getDb();
+  db.run('DELETE FROM equipment WHERE id = ?', [id], (err) => {
+    db.close();
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true });
+  });
+});
+
+// ========== TRANSACTION / POS ENDPOINTS ==========
+
+// GET /api/transactions - list all transactions
+app.get('/api/transactions', (req, res) => {
+  const db = getDb();
+  db.all(`
+    SELECT 
+      t.id, t.transaction_number, t.diver_id, t.booking_id, t.type, t.status,
+      t.subtotal, t.tax, t.discount, t.total, t.notes, t.created_at,
+      d.name as diver_name, d.email as diver_email,
+      b.invoice_number as booking_invoice
+    FROM transactions t
+    LEFT JOIN divers d ON t.diver_id = d.id
+    LEFT JOIN bookings b ON t.booking_id = b.id
+    ORDER BY t.created_at DESC
+  `, (err, transactions) => {
+    db.close();
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(transactions || []);
+  });
+});
+
+// GET /api/transactions/:id - get transaction with items
+app.get('/api/transactions/:id', (req, res) => {
+  const { id } = req.params;
+  const db = getDb();
+  db.get(`
+    SELECT 
+      t.id, t.transaction_number, t.diver_id, t.booking_id, t.type, t.status,
+      t.subtotal, t.tax, t.discount, t.total, t.notes, t.created_at,
+      d.name as diver_name, d.email as diver_email
+    FROM transactions t
+    LEFT JOIN divers d ON t.diver_id = d.id
+    WHERE t.id = ?
+  `, [id], (err, transaction) => {
+    if (err) {
+      db.close();
+      return res.status(500).json({ error: err.message });
+    }
+    if (!transaction) {
+      db.close();
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+
+    // Get transaction items
+    db.all(`
+      SELECT 
+        ti.id, ti.transaction_id, ti.equipment_id, ti.quantity, ti.unit_price, ti.subtotal,
+        e.name as equipment_name, e.category, e.sku
+      FROM transaction_items ti
+      LEFT JOIN equipment e ON ti.equipment_id = e.id
+      WHERE ti.transaction_id = ?
+    `, [id], (err, items) => {
+      db.close();
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ ...transaction, items: items || [] });
+    });
+  });
+});
+
+// POST /api/transactions - create new transaction
+app.post('/api/transactions', (req, res) => {
+  const { diver_id, booking_id, items, tax, discount, notes } = req.body;
+  if (!items || items.length === 0) {
+    return res.status(400).json({ error: 'At least one item required' });
+  }
+
+  const db = getDb();
+  const transactionId = uuidv4();
+  const transactionNumber = `TXN-${Date.now()}`;
+  
+  // Calculate totals
+  let subtotal = 0;
+  items.forEach(item => {
+    subtotal += (item.unit_price || 0) * (item.quantity || 1);
+  });
+  
+  const taxAmount = tax || 0;
+  const discountAmount = discount || 0;
+  const total = subtotal + taxAmount - discountAmount;
+
+  db.run(
+    'INSERT INTO transactions (id, transaction_number, diver_id, booking_id, type, subtotal, tax, discount, total, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [transactionId, transactionNumber, diver_id || null, booking_id || null, 'pos_sale', subtotal, taxAmount, discountAmount, total, notes || null],
+    (err) => {
+      if (err) {
+        db.close();
+        return res.status(500).json({ error: err.message });
+      }
+
+      // Insert transaction items
+      let completed = 0;
+      items.forEach(item => {
+        const itemId = uuidv4();
+        const itemSubtotal = (item.unit_price || 0) * (item.quantity || 1);
+        
+        db.run(
+          'INSERT INTO transaction_items (id, transaction_id, equipment_id, quantity, unit_price, subtotal) VALUES (?, ?, ?, ?, ?, ?)',
+          [itemId, transactionId, item.equipment_id, item.quantity || 1, item.unit_price || 0, itemSubtotal],
+          (err) => {
+            completed++;
+            if (completed === items.length) {
+              // Update equipment quantity
+              items.forEach(item => {
+                db.run(
+                  'UPDATE equipment SET quantity_in_stock = quantity_in_stock - ? WHERE id = ?',
+                  [item.quantity || 1, item.equipment_id]
+                );
+              });
+
+              db.get('SELECT * FROM transactions WHERE id = ?', [transactionId], (err, transaction) => {
+                db.close();
+                if (err) return res.status(500).json({ error: err.message });
+                res.status(201).json(transaction);
+              });
+            }
+          }
+        );
+      });
+    }
+  );
+});
+
+// ========== PAYMENT ENDPOINTS ==========
+
+// GET /api/payments - list all payments
+app.get('/api/payments', (req, res) => {
+  const db = getDb();
+  db.all(`
+    SELECT 
+      p.id, p.transaction_id, p.amount, p.payment_method, p.payment_status, p.reference_number, p.notes, p.created_at,
+      t.transaction_number, t.total as transaction_total
+    FROM payments p
+    LEFT JOIN transactions t ON p.transaction_id = t.id
+    ORDER BY p.created_at DESC
+  `, (err, payments) => {
+    db.close();
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(payments || []);
+  });
+});
+
+// POST /api/payments - create new payment
+app.post('/api/payments', (req, res) => {
+  const { transaction_id, amount, payment_method, reference_number, notes } = req.body;
+  if (!transaction_id || !amount) {
+    return res.status(400).json({ error: 'transaction_id and amount required' });
+  }
+
+  const db = getDb();
+  const id = uuidv4();
+  db.run(
+    'INSERT INTO payments (id, transaction_id, amount, payment_method, reference_number, notes) VALUES (?, ?, ?, ?, ?, ?)',
+    [id, transaction_id, amount, payment_method || 'cash', reference_number || null, notes || null],
+    (err) => {
+      if (err) {
+        db.close();
+        return res.status(500).json({ error: err.message });
+      }
+      db.get('SELECT * FROM payments WHERE id = ?', [id], (err, payment) => {
+        db.close();
+        if (err) return res.status(500).json({ error: err.message });
+        res.status(201).json(payment);
+      });
+    }
+  );
+});
+
+// GET /api/pos/summary - get POS summary (daily sales, etc)
+app.get('/api/pos/summary', (req, res) => {
+  const db = getDb();
+  const today = new Date().toISOString().split('T')[0];
+  
+  db.all(`
+    SELECT 
+      COUNT(DISTINCT t.id) as transaction_count,
+      SUM(t.total) as total_sales,
+      SUM(p.amount) as total_paid,
+      COUNT(DISTINCT p.id) as payment_count
+    FROM transactions t
+    LEFT JOIN payments p ON t.id = p.transaction_id
+    WHERE DATE(t.created_at) = ?
+  `, [today], (err, summary) => {
+    if (err) {
+      db.close();
+      return res.status(500).json({ error: err.message });
+    }
+
+    // Get low stock items
+    db.all('SELECT id, name, category, quantity_in_stock, reorder_level FROM equipment WHERE quantity_in_stock <= reorder_level ORDER BY quantity_in_stock ASC', (err, lowStock) => {
+      db.close();
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({
+        today: summary[0] || {},
+        low_stock_items: lowStock || []
+      });
+    });
+  });
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);

@@ -182,6 +182,75 @@ export function initDb() {
           FOREIGN KEY(dive_site_id) REFERENCES dive_sites(id) ON DELETE SET NULL,
           UNIQUE(group_id, day_number)
         )
+      `);
+
+      // Equipment/Inventory table
+      db.run(`
+        CREATE TABLE IF NOT EXISTS equipment (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          category TEXT NOT NULL,
+          sku TEXT UNIQUE,
+          price REAL DEFAULT 0,
+          quantity_in_stock INTEGER DEFAULT 0,
+          reorder_level INTEGER DEFAULT 5,
+          supplier TEXT,
+          description TEXT,
+          barcode TEXT UNIQUE,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+
+      // Transactions/Sales table
+      db.run(`
+        CREATE TABLE IF NOT EXISTS transactions (
+          id TEXT PRIMARY KEY,
+          transaction_number TEXT UNIQUE NOT NULL,
+          diver_id TEXT,
+          booking_id TEXT,
+          type TEXT NOT NULL,
+          status TEXT DEFAULT 'completed',
+          subtotal REAL DEFAULT 0,
+          tax REAL DEFAULT 0,
+          discount REAL DEFAULT 0,
+          total REAL DEFAULT 0,
+          notes TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY(diver_id) REFERENCES divers(id) ON DELETE SET NULL,
+          FOREIGN KEY(booking_id) REFERENCES bookings(id) ON DELETE SET NULL
+        )
+      `);
+
+      // Transaction Items table (items in a sale)
+      db.run(`
+        CREATE TABLE IF NOT EXISTS transaction_items (
+          id TEXT PRIMARY KEY,
+          transaction_id TEXT NOT NULL,
+          equipment_id TEXT NOT NULL,
+          quantity INTEGER DEFAULT 1,
+          unit_price REAL DEFAULT 0,
+          subtotal REAL DEFAULT 0,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY(transaction_id) REFERENCES transactions(id) ON DELETE CASCADE,
+          FOREIGN KEY(equipment_id) REFERENCES equipment(id) ON DELETE CASCADE
+        )
+      `);
+
+      // Payments table
+      db.run(`
+        CREATE TABLE IF NOT EXISTS payments (
+          id TEXT PRIMARY KEY,
+          transaction_id TEXT NOT NULL,
+          amount REAL NOT NULL,
+          payment_method TEXT DEFAULT 'cash',
+          payment_status TEXT DEFAULT 'completed',
+          reference_number TEXT,
+          notes TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY(transaction_id) REFERENCES transactions(id) ON DELETE CASCADE
+        )
       `, (err) => {
         if (err) reject(err);
         else resolve();

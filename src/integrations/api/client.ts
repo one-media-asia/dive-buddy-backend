@@ -82,4 +82,27 @@ export const apiClient = {
     get: (groupId) => apiClient.request('GET', `/api/groups/${groupId}/itinerary`),
     updateDay: (groupId, payload) => apiClient.request('POST', `/api/groups/${groupId}/itinerary`, payload),
   },
+
+  equipment: {
+    list: () => apiClient.request('GET', '/api/equipment'),
+    get: (id) => apiClient.request('GET', `/api/equipment/${id}`),
+    create: (payload) => apiClient.request('POST', '/api/equipment', payload),
+    update: (id, payload) => apiClient.request('PUT', `/api/equipment/${id}`, payload),
+    delete: (id) => apiClient.request('DELETE', `/api/equipment/${id}`),
+  },
+
+  transactions: {
+    list: () => apiClient.request('GET', '/api/transactions'),
+    get: (id) => apiClient.request('GET', `/api/transactions/${id}`),
+    create: (payload) => apiClient.request('POST', '/api/transactions', payload),
+  },
+
+  payments: {
+    list: () => apiClient.request('GET', '/api/payments'),
+    create: (payload) => apiClient.request('POST', '/api/payments', payload),
+  },
+
+  pos: {
+    getSummary: () => apiClient.request('GET', '/api/pos/summary'),
+  },
 };

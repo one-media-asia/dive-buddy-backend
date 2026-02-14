@@ -44,6 +44,22 @@ const diveSites = [
   { name: 'The Pinnacle', location: 'Central Banks', max_depth: 30, difficulty: 'moderate' },
 ];
 
+const equipment = [
+  { name: 'Diving Mask', category: 'masks', sku: 'MASK-001', price: 45, quantity_in_stock: 25, reorder_level: 5 },
+  { name: 'Snorkel', category: 'snorkels', sku: 'SNOR-001', price: 25, quantity_in_stock: 30, reorder_level: 5 },
+  { name: 'Fins (Pair)', category: 'fins', sku: 'FIN-001', price: 65, quantity_in_stock: 20, reorder_level: 5 },
+  { name: 'Wetsuit 3mm', category: 'wetsuits', sku: 'WET-3MM', price: 120, quantity_in_stock: 15, reorder_level: 3 },
+  { name: 'Wetsuit 5mm', category: 'wetsuits', sku: 'WET-5MM', price: 150, quantity_in_stock: 10, reorder_level: 3 },
+  { name: 'Diving Tank (AL80)', category: 'tanks', sku: 'TANK-AL80', price: 199, quantity_in_stock: 8, reorder_level: 2 },
+  { name: 'BCD (Buoyancy)', category: 'bcds', sku: 'BCD-001', price: 349, quantity_in_stock: 6, reorder_level: 2 },
+  { name: 'Regulator Set', category: 'regs', sku: 'REG-001', price: 399, quantity_in_stock: 5, reorder_level: 2 },
+  { name: 'Weight Belt', category: 'weights', sku: 'BELT-001', price: 35, quantity_in_stock: 12, reorder_level: 5 },
+  { name: 'Diving Computer', category: 'computers', sku: 'COMP-001', price: 299, quantity_in_stock: 4, reorder_level: 1 },
+  { name: 'Underwater Torch', category: 'lights', sku: 'TORCH-001', price: 89, quantity_in_stock: 8, reorder_level: 2 },
+  { name: 'Dive Log Book', category: 'books', sku: 'LOG-001', price: 15, quantity_in_stock: 40, reorder_level: 10 },
+];
+
+
 console.log('Initializing database...');
 await initDb();
 
@@ -114,6 +130,17 @@ db.serialize(() => {
       [uuidv4(), site.name, site.location, site.max_depth, site.difficulty],
       (err) => {
         if (!err) console.log(`Added dive site: ${site.name}`);
+      }
+    );
+  });
+
+  // Seed equipment
+  equipment.forEach((item) => {
+    db.run(
+      'INSERT OR IGNORE INTO equipment (id, name, category, sku, price, quantity_in_stock, reorder_level) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [uuidv4(), item.name, item.category, item.sku, item.price, item.quantity_in_stock, item.reorder_level],
+      (err) => {
+        if (!err) console.log(`Added equipment: ${item.name}`);
       }
     );
   });
