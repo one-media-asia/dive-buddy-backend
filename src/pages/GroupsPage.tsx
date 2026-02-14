@@ -7,6 +7,7 @@ export default function GroupsPage() {
   const [divers, setDivers] = useState<any[]>([]);
   const [name, setName] = useState('');
   const [leader, setLeader] = useState<string | undefined>(undefined);
+  const [selectedForGroup, setSelectedForGroup] = useState<Record<string, string>>({});
 
   useEffect(() => {
     (async () => {
@@ -62,18 +63,39 @@ export default function GroupsPage() {
                     <div className="text-sm text-muted-foreground">Leader: {g.leader?.name || '—'}</div>
                   </div>
                 </div>
+
                 <div className="mt-2">
+                  <label className="text-sm">Members</label>
+                  <div className="mt-2 space-y-2">
+                    {(g.members ?? []).length === 0 && <div className="text-sm text-muted-foreground">No members</div>}
+                    {(g.members ?? []).map((m:any) => (
+                      <div key={m.id} className="flex items-center justify-between bg-muted p-2 rounded">
+                        <div>{m.diver?.name || 'Unknown'}</div>
+                        <div className="flex items-center gap-2">
+                          <div className="text-sm text-muted-foreground">{m.role || ''}</div>
+                          <button className="btn btn-sm" onClick={async () => {
+                            if (!confirm(`Remove ${m.diver?.name || 'this member'} from ${g.name}?`)) return;
+                            await removeMember(m.id);
+                          }}>Remove</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-3">
                   <label className="text-sm">Add member</label>
                   <div className="flex gap-2 mt-2">
-                    <select id={`add-${g.id}`} className="flex-1">
+                    <select className="flex-1" value={selectedForGroup[g.id] ?? ''} onChange={(e) => setSelectedForGroup(s => ({ ...s, [g.id]: e.target.value }))}>
                       <option value="">Select diver…</option>
                       {divers.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                     </select>
                     <button onClick={async (e) => {
                       e.preventDefault();
-                      const sel = (document.getElementById(`add-${g.id}`) as HTMLSelectElement);
-                      if (!sel || !sel.value) return;
-                      await addMember(g.id, sel.value);
+                      const diverId = selectedForGroup[g.id];
+                      if (!diverId) return;
+                      await addMember(g.id, diverId);
+                      setSelectedForGroup(s => ({ ...s, [g.id]: '' }));
                     }} className="btn">Add</button>
                   </div>
                 </div>

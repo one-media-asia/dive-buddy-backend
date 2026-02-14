@@ -1,21 +1,37 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 export function useGroups() {
   const [groups, setGroups] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const loadGroups = useCallback(async () => {
+    setLoading(true);
+    // select groups with leader and members (members include diver info)
+    const { data, error } = await supabase
+      .from('groups')
+      .select('*, leader:leader_id(*), members:group_members(id, role, diver:diver_id(id, name))')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      setGroups([]);
+      setLoading(false);
+      return { data: null, error };
+    }
+
+    setGroups(data ?? []);
+    setLoading(false);
+    return { data };
+  }, []);
+
   useEffect(() => {
     let mounted = true;
     (async () => {
-      setLoading(true);
-      const { data } = await supabase.from('groups').select('*, leader:leader_id(*)').order('created_at', { ascending: false });
       if (!mounted) return;
-      setGroups(data ?? []);
-      setLoading(false);
+      await loadGroups();
     })();
     return () => { mounted = false; };
-  }, []);
+  }, [loadGroups]);
 
   async function createGroup(payload: { name: string; leader_id?: string | null; description?: string | null }) {
     const { data, error } = await supabase.from('groups').insert([{
@@ -23,17 +39,26 @@ export function useGroups() {
       leader_id: payload.leader_id ?? null,
       description: payload.description ?? null,
     }]).select().single();
-    if (!error && data) setGroups((s) => [data, ...s]);
+    if (!error && data) {
+      // refresh list to include relations
+      await loadGroups();
+    }
     return { data, error };
   }
 
   async function addMember(groupId: string, diverId: string, role?: string) {
     const { data, error } = await supabase.from('group_members').insert([{ group_id: groupId, diver_id: diverId, role }]).select().single();
+    if (!error) {
+      await loadGroups();
+    }
     return { data, error };
   }
 
   async function removeMember(memberId: string) {
     const { error } = await supabase.from('group_members').delete().eq('id', memberId);
+    if (!error) {
+      await loadGroups();
+    }
     return { error };
   }
 
