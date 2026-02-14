@@ -18,6 +18,14 @@ import BookingsPage from "@/pages/BookingsPage";
 import EmergencyPage from "@/pages/EmergencyPage";
 import AccommodationsPage from "@/pages/AccommodationsPage";
 import NotFound from "./pages/NotFound";
+import TripsPage from "@/pages/TripsPage";
+import TripBooking from "@/pages/TripBooking";
+
+import WaiverForm from "@/components/WaiverForm";
+import InventoryPage from "@/pages/InventoryPage";
+import MaintenancePage from "@/pages/MaintenancePage";
+import HiraPage from "@/pages/HiraPage";
+import IncidentsPage from "@/pages/IncidentsPage";
 
 const queryClient = new QueryClient();
 
@@ -39,6 +47,14 @@ function ProtectedRoutes() {
         <Route path="/boats" element={<BoatsPage />} />
         <Route path="/courses" element={<CoursesPage />} />
         <Route path="/bookings" element={<BookingsPage />} />
+        <Route path="/trips" element={<TripsPage />} />
+        <Route path="/trips/:id" element={<TripBooking />} />
+        <Route path="/trips/:id/book" element={<TripBooking />} />
+        <Route path="/waiver" element={<WaiverForm />} />
+        <Route path="/inventory" element={<InventoryPage />} />
+        <Route path="/maintenance" element={<MaintenancePage />} />
+        <Route path="/hira" element={<HiraPage />} />
+        <Route path="/incidents" element={<IncidentsPage />} />
         <Route path="/emergency" element={<EmergencyPage />} />
         <Route path="/accommodations" element={<AccommodationsPage />} />
         <Route path="*" element={<NotFound />} />

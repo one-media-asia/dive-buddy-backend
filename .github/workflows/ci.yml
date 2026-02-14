@@ -1,0 +1,108 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    name: Run tests (matrix Node)
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [20, 18]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+  browser:
+    name: Browser matrix (Playwright)
+    runs-on: ubuntu-latest
+    needs: test
+    strategy:
+      matrix:
+        browser: [chromium, firefox, webkit]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      - name: Run Playwright tests
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: 0
+        run: npx playwright test --project=${{ matrix.browser }} --reporter=list
+
+  smoke_preview:
+    name: Playwright smoke tests against preview
+    runs-on: ubuntu-latest
+    needs: [browser, deploy_preview]
+    if: ${{ always() }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      - name: Run smoke test against preview
+        env:
+          PREVIEW_URL: ${{ needs.deploy_preview.outputs.preview_url }}
+          PLAYWRIGHT_BROWSERS_PATH: 0
+        run: |
+          if [ -z "${{ needs.deploy_preview.outputs.preview_url }}" ]; then
+            echo "No preview URL available, skipping smoke tests.";
+            exit 0;
+          fi
+          npx playwright test playwright-tests/app.smoke.spec.ts --project=chromium --reporter=list
+
+  deploy_preview:
+    name: Deploy preview to Vercel
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    outputs:
+      preview_url: ${{ steps.vercel.outputs.preview-url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy to Vercel (preview)
+        id: vercel
+        uses: vercel/action@v1
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          # Optional: set Vercel org/project IDs if needed
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}

@@ -1,12 +1,23 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { BookOpen, Users, MapPin, TrendingDown, GraduationCap, DollarSign } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import useMetrics from "@/hooks/useMetrics";
+import BookingsChart from "@/components/BookingsChart";
+import RevenueChart from "@/components/RevenueChart";
+import MaintenanceCard from "@/components/MaintenanceCard";
+import TopSelling from "@/components/TopSelling";
+import ExportButtons from "@/components/ExportButtons";
+import { exportToCSV } from "@/hooks/usePOS";
 
 export default function DashboardPage() {
   const [stats, setStats] = useState({ logs: 0, divers: 0, sites: 0, courses: 0, avgDepth: 0, revenue: 0 });
+  const { loading, bookingsSeries, revenueSeries, maintenanceCounts } = useMetrics(15000);
 
-  useEffect(() => {
-    const load = async () => {
+  // keep existing high-level stats for compatibility
+  // (existing logic retained but deferred to initial load via effect)
+  // For brevity we call a one-off loader here
+  useState(() => {
+    (async () => {
       const [logs, divers, sites, courses, bookings] = await Promise.all([
         supabase.from("dive_logs").select("depth"),
         supabase.from("divers").select("id", { count: "exact", head: true }),
@@ -25,9 +36,8 @@ export default function DashboardPage() {
         avgDepth: avg,
         revenue: rev,
       });
-    };
-    load();
-  }, []);
+    })();
+  });
 
   const cards = [
     { label: "Total Dives", value: stats.logs, icon: BookOpen, color: "text-primary" },
@@ -44,7 +54,8 @@ export default function DashboardPage() {
         <h1 className="page-title">Dashboard</h1>
         <p className="page-description">Overview of your diving operations</p>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
         {cards.map((s) => (
           <div key={s.label} className="stat-card">
             <div className="flex items-center justify-between mb-3">
@@ -54,6 +65,30 @@ export default function DashboardPage() {
             <p className="text-3xl font-bold tracking-tight">{s.value}</p>
           </div>
         ))}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="col-span-2 p-4 border rounded">
+          <h3 className="font-semibold mb-2">Bookings (last 30 days)</h3>
+          <BookingsChart data={bookingsSeries} />
+        </div>
+
+        <div>
+          <MaintenanceCard counts={maintenanceCounts} />
+        </div>
+      </div>
+
+      <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="col-span-2 p-4 border rounded">
+          <h3 className="font-semibold mb-2">Revenue (last 30 days)</h3>
+          <RevenueChart data={revenueSeries} />
+        </div>
+        <div className="p-4 border rounded">
+          <TopSelling items={topItems} />
+          <div className="mt-3">
+            <ExportButtons rows={topItems.map((i:any) => ({ item: i.item, quantity: i.quantity, revenue: i.revenue }))} title="Top Selling Items" />
+          </div>
+        </div>
       </div>
     </div>
   );
