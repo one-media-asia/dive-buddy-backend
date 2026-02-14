@@ -209,14 +209,14 @@ export default function GroupsPage() {
                         <Button 
                           variant="outline" 
                           size="sm"
-                          onClick={() => handleOpenItinerary(g.id)}
+                          onClick={() => handleOpenItinerary(String(g.id))}
                         >
                           Plan Dives
                         </Button>
                       </DialogTrigger>
                       <DialogContent className="max-w-2xl">
                         <DialogHeader>
-                          <DialogTitle>Dive Plan: {g.name}</DialogTitle>
+                          <DialogTitle>Dive Plan: {String(g.name)}</DialogTitle>
                         </DialogHeader>
                         <div className="space-y-4">
                           {Array.from({ length: numDays }).map((_, dayIdx) => {
@@ -273,7 +273,7 @@ export default function GroupsPage() {
                                 !confirm(`Remove ${m.diver?.name || 'this member'} from ${g.name}?`)
                               )
                                 return;
-                              await removeMember(m.id, g.id);
+                              await removeMember(String(m.id), String(g.id));
                             }}
                           >
                             Remove
@@ -305,10 +305,10 @@ export default function GroupsPage() {
                     <button
                       onClick={async (e) => {
                         e.preventDefault();
-                        const diverId = selectedForGroup[g.id];
+                        const diverId = selectedForGroup[String(g.id)];
                         if (!diverId) return;
-                        await addMember(g.id, diverId);
-                        setSelectedForGroup((s) => ({ ...s, [g.id]: '' }));
+                        await addMember(String(g.id), diverId);
+                        setSelectedForGroup((s) => ({ ...s, [String(g.id)]: '' }));
                       }}
                       className="btn"
                     >
