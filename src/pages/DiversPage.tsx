@@ -1,101 +1,165 @@
 import { useState, useEffect } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Edit2, CheckCircle, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/integrations/supabase/client";
+import { Card } from "@/components/ui/card";
+import { apiClient } from "@/integrations/api/client";
 import { useToast } from "@/hooks/use-toast";
 
-const skillColors: Record<string, string> = {
-  beginner: "bg-success/20 text-success border-success/30",
-  intermediate: "bg-info/20 text-info border-info/30",
-  advanced: "bg-warning/20 text-warning border-warning/30",
-  expert: "bg-destructive/20 text-destructive border-destructive/30",
-};
+const certificationOptions = [
+  "PADI Open Water", "PADI Advanced Open Water", "PADI Rescue Diver", "PADI Divemaster",
+  "SSI Open Water", "SSI Advanced", "NAUI Scuba Diver",
+  "CMAS 1 Star", "CMAS 2 Star", "CMAS 3 Star"
+];
 
 export default function DiversPage() {
   const [divers, setDivers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ name: "", email: "", certification: "", skillLevel: "", totalDives: "", emergency_contact_name: "", emergency_contact_phone: "", medical_conditions: "" });
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    certification_level: "",
+    medical_cleared: true,
+  });
   const { toast } = useToast();
 
   const load = async () => {
-    const { data } = await supabase.from("divers").select("*").order("created_at", { ascending: false });
-    if (data) setDivers(data);
+    setLoading(true);
+    try {
+      const data = await apiClient.divers.list();
+      setDivers(data);
+    } catch (err) {
+      console.error('Failed to load divers', err);
+      toast({ title: "Error", description: String(err), variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { load(); }, []);
 
-  const handleSubmit = async () => {
-    if (!form.name || !form.certification || !form.skillLevel) return;
-    const { error } = await supabase.from("divers").insert({
-      name: form.name, email: form.email || null, certification: form.certification,
-      skill_level: form.skillLevel, total_dives: Number(form.totalDives) || 0,
-      emergency_contact_name: form.emergency_contact_name || null,
-      emergency_contact_phone: form.emergency_contact_phone || null,
-      medical_conditions: form.medical_conditions || null,
-    });
-    if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
-    setForm({ name: "", email: "", certification: "", skillLevel: "", totalDives: "", emergency_contact_name: "", emergency_contact_phone: "", medical_conditions: "" });
-    setOpen(false);
-    load();
+  const handleOpenForm = (diver?: any) => {
+    if (diver) {
+      setEditingId(diver.id);
+      setForm({
+        name: diver.name,
+        email: diver.email,
+        phone: diver.phone || "",
+        certification_level: diver.certification_level || "",
+        medical_cleared: diver.medical_cleared ? true : false,
+      });
+    } else {
+      setEditingId(null);
+      setForm({ name: "", email: "", phone: "", certification_level: "", medical_cleared: true });
+    }
+    setOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
-    await supabase.from("divers").delete().eq("id", id);
-    load();
+  const handleSubmit = async () => {
+    if (!form.name || !form.email) {
+      toast({ title: "Error", description: "Name and email are required", variant: "destructive" });
+      return;
+    }
+
+    try {
+      if (editingId) {
+        await apiClient.divers.update(editingId, form);
+        toast({ title: "Success", description: "Diver updated successfully" });
+      } else {
+        await apiClient.divers.create(form);
+        toast({ title: "Success", description: "Diver created successfully" });
+      }
+      setOpen(false);
+      load();
+    } catch (err) {
+      toast({ title: "Error", description: String(err), variant: "destructive" });
+    }
   };
+
+  const handleDelete = async (id: string, name: string) => {
+    if (!confirm(`Delete diver "${name}"?`)) return;
+    try {
+      await apiClient.divers.delete(id);
+      toast({ title: "Success", description: "Diver deleted successfully" });
+      load();
+    } catch (err) {
+      toast({ title: "Error", description: String(err), variant: "destructive" });
+    }
+  };
+
+  const handleCompleteOnboarding = async (id: string, name: string) => {
+    try {
+      await apiClient.divers.completeOnboarding(id);
+      toast({ title: "Success", description: `${name}'s onboarding completed` });
+      load();
+    } catch (err) {
+      toast({ title: "Error", description: String(err), variant: "destructive" });
+    }
+  };
+
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  }
 
   return (
     <div>
       <div className="page-header flex items-center justify-between">
         <div>
           <h1 className="page-title">Divers</h1>
-          <p className="page-description">Manage diver profiles, certifications and skill levels</p>
+          <p className="page-description">Manage diver profiles, certifications, and waivers</p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button><Plus className="h-4 w-4 mr-2" />Add Diver</Button>
+            <Button onClick={() => handleOpenForm()}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Diver
+            </Button>
           </DialogTrigger>
           <DialogContent className="max-w-lg">
-            <DialogHeader><DialogTitle>New Diver</DialogTitle></DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2"><Label>Name</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
-              <div className="grid gap-2"><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
-              <div className="grid gap-2">
-                <Label>Certification</Label>
-                <Select value={form.certification} onValueChange={(v) => setForm({ ...form, certification: v })}>
-                  <SelectTrigger><SelectValue placeholder="Select certification" /></SelectTrigger>
+            <DialogHeader>
+              <DialogTitle>{editingId ? "Edit Diver" : "New Diver"}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label>Name *</Label>
+                <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Full name" />
+              </div>
+              <div>
+                <Label>Email *</Label>
+                <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="email@example.com" />
+              </div>
+              <div>
+                <Label>Phone</Label>
+                <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+1234567890" />
+              </div>
+              <div>
+                <Label>Certification Level</Label>
+                <Select value={form.certification_level} onValueChange={(v) => setForm({ ...form, certification_level: v })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select certification..." />
+                  </SelectTrigger>
                   <SelectContent>
-                    {["PADI Open Water", "PADI Advanced Open Water", "PADI Rescue Diver", "PADI Divemaster", "SSI Open Water", "SSI Advanced", "NAUI Scuba Diver", "CMAS 1 Star", "CMAS 2 Star", "CMAS 3 Star"].map((c) => (
+                    {certificationOptions.map((c) => (
                       <SelectItem key={c} value={c}>{c}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label>Skill Level</Label>
-                  <Select value={form.skillLevel} onValueChange={(v) => setForm({ ...form, skillLevel: v })}>
-                    <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                    <SelectContent>
-                      {["beginner", "intermediate", "advanced", "expert"].map((s) => (
-                        <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-2"><Label>Total Dives</Label><Input type="number" value={form.totalDives} onChange={(e) => setForm({ ...form, totalDives: e.target.value })} /></div>
+              <div className="flex items-center gap-2">
+                <input type="checkbox" id="medical" checked={form.medical_cleared} onChange={(e) => setForm({ ...form, medical_cleared: e.target.checked })} />
+                <Label htmlFor="medical" className="!mt-0">Medical clearance obtained</Label>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2"><Label>Emergency Contact</Label><Input value={form.emergency_contact_name} onChange={(e) => setForm({ ...form, emergency_contact_name: e.target.value })} placeholder="Contact name" /></div>
-                <div className="grid gap-2"><Label>Emergency Phone</Label><Input value={form.emergency_contact_phone} onChange={(e) => setForm({ ...form, emergency_contact_phone: e.target.value })} placeholder="Phone number" /></div>
+              <div className="flex gap-2 justify-end pt-2">
+                <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+                <Button onClick={handleSubmit}>{editingId ? "Update" : "Create"}</Button>
               </div>
-              <div className="grid gap-2"><Label>Medical Conditions</Label><Input value={form.medical_conditions} onChange={(e) => setForm({ ...form, medical_conditions: e.target.value })} placeholder="Any relevant conditions" /></div>
-              <Button onClick={handleSubmit}>Save Diver</Button>
             </div>
           </DialogContent>
         </Dialog>
@@ -103,33 +167,89 @@ export default function DiversPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {divers.map((diver) => (
-          <div key={diver.id} className="bg-card rounded-lg border p-5 relative group">
-            <Button variant="ghost" size="icon" className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => handleDelete(diver.id)}>
-              <Trash2 className="h-4 w-4 text-destructive" />
-            </Button>
-            <div className="flex items-center gap-3 mb-3">
-              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
-                {diver.name.split(" ").map((n: string) => n[0]).join("")}
+          <Card key={diver.id} className="p-4">
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex-1">
+                <h3 className="font-semibold">{diver.name}</h3>
+                <p className="text-sm text-muted-foreground">{diver.email}</p>
               </div>
-              <div>
-                <p className="font-semibold">{diver.name}</p>
-                <p className="text-xs text-muted-foreground">{diver.email}</p>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={() => handleOpenForm(diver)}>
+                  <Edit2 className="h-4 w-4" />
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => handleDelete(diver.id, diver.name)}>
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
               </div>
             </div>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between"><span className="text-muted-foreground">Certification</span><span className="font-medium">{diver.certification}</span></div>
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Skill Level</span>
-                <Badge variant="outline" className={`capitalize ${skillColors[diver.skill_level]}`}>{diver.skill_level}</Badge>
+
+            {diver.phone && (
+              <p className="text-sm text-muted-foreground mb-2">📞 {diver.phone}</p>
+            )}
+
+            {diver.certification_level && (
+              <Badge variant="outline" className="mb-3">{diver.certification_level}</Badge>
+            )}
+
+            <div className="space-y-2 mt-3 pt-3 border-t">
+              {/* Medical Clearance */}
+              <div className="flex items-center gap-2 text-sm">
+                {diver.medical_cleared ? (
+                  <CheckCircle className="h-4 w-4 text-success" />
+                ) : (
+                  <Clock className="h-4 w-4 text-warning" />
+                )}
+                <span className="text-muted-foreground">
+                  {diver.medical_cleared ? "Medical cleared" : "Pending medical clearance"}
+                </span>
               </div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Total Dives</span><span className="font-mono font-medium">{diver.total_dives}</span></div>
-              {diver.emergency_contact_name && (
-                <div className="flex justify-between"><span className="text-muted-foreground">Emergency</span><span className="text-xs">{diver.emergency_contact_name} {diver.emergency_contact_phone}</span></div>
+
+              {/* Waiver Status */}
+              <div className="flex items-center gap-2 text-sm">
+                {diver.waiver_signed ? (
+                  <CheckCircle className="h-4 w-4 text-success" />
+                ) : (
+                  <Clock className="h-4 w-4 text-warning" />
+                )}
+                <span className="text-muted-foreground">
+                  {diver.waiver_signed ? `Waiver signed (${new Date(diver.waiver_signed_date).toLocaleDateString()})` : "Waiver pending"}
+                </span>
+              </div>
+
+              {/* Onboarding Status */}
+              <div className="flex items-center gap-2 text-sm">
+                {diver.onboarding_completed ? (
+                  <CheckCircle className="h-4 w-4 text-success" />
+                ) : (
+                  <Clock className="h-4 w-4 text-warning" />
+                )}
+                <span className="text-muted-foreground">
+                  {diver.onboarding_completed ? `Onboarding completed` : "Onboarding pending"}
+                </span>
+              </div>
+
+              {/* Complete Onboarding Button */}
+              {!diver.onboarding_completed && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full mt-2"
+                  onClick={() => handleCompleteOnboarding(diver.id, diver.name)}
+                >
+                  Complete Onboarding
+                </Button>
               )}
             </div>
-          </div>
+          </Card>
         ))}
       </div>
+
+      {divers.length === 0 && (
+        <div className="text-center py-12">
+          <p className="text-muted-foreground mb-3">No divers yet</p>
+          <Button onClick={() => handleOpenForm()}>Add First Diver</Button>
+        </div>
+      )}
     </div>
   );
 }

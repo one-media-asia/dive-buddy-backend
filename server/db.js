@@ -23,6 +23,10 @@ export function initDb() {
           phone TEXT,
           certification_level TEXT,
           medical_cleared INTEGER DEFAULT 1,
+          waiver_signed INTEGER DEFAULT 0,
+          waiver_signed_date TEXT,
+          onboarding_completed INTEGER DEFAULT 0,
+          onboarding_date TEXT,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
@@ -96,9 +100,26 @@ export function initDb() {
           payment_status TEXT DEFAULT 'unpaid',
           notes TEXT,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           FOREIGN KEY(diver_id) REFERENCES divers(id) ON DELETE CASCADE,
           FOREIGN KEY(course_id) REFERENCES courses(id) ON DELETE SET NULL,
           FOREIGN KEY(accommodation_id) REFERENCES accommodations(id) ON DELETE SET NULL
+        )
+      `);
+
+      // Waivers table
+      db.run(`
+        CREATE TABLE IF NOT EXISTS waivers (
+          id TEXT PRIMARY KEY,
+          diver_id TEXT NOT NULL,
+          document_url TEXT,
+          signature_data TEXT,
+          signed_at DATETIME,
+          status TEXT DEFAULT 'pending',
+          notes TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY(diver_id) REFERENCES divers(id) ON DELETE CASCADE,
+          UNIQUE(diver_id)
         )
       `, (err) => {
         if (err) reject(err);

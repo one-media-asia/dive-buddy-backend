@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Trash2, FileText } from "lucide-react";
+import { Plus, Trash2, Edit2, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -18,7 +18,8 @@ export default function BookingsPage() {
   const [stats, setStats] = useState({ booking_count: 0, total_revenue: 0, total_amount: 0 });
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ diver_id: "", course_id: "", accommodation_id: "", check_in: "", check_out: "", notes: "" });
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState({ diver_id: "", course_id: "", accommodation_id: "", check_in: "", check_out: "", payment_status: "unpaid", notes: "" });
   const { toast } = useToast();
 
   const load = async () => {
@@ -58,20 +59,57 @@ export default function BookingsPage() {
     return total;
   };
 
+  const handleOpenForm = (booking?: any) => {
+    if (booking) {
+      setEditingId(booking.id);
+      setForm({
+        diver_id: booking.diver_id,
+        course_id: booking.course_id || "",
+        accommodation_id: booking.accommodation_id || "",
+        check_in: booking.check_in || "",
+        check_out: booking.check_out || "",
+        payment_status: booking.payment_status || "unpaid",
+        notes: booking.notes || "",
+      });
+    } else {
+      setEditingId(null);
+      setForm({ diver_id: "", course_id: "", accommodation_id: "", check_in: "", check_out: "", payment_status: "unpaid", notes: "" });
+    }
+    setOpen(true);
+  };
+
   const handleSubmit = async () => {
-    if (!form.diver_id) return;
+    if (!form.diver_id) {
+      toast({ title: "Error", description: "Diver is required", variant: "destructive" });
+      return;
+    }
+
     const total = calcTotal();
     try {
-      await apiClient.bookings.create({
-        diver_id: form.diver_id,
-        course_id: form.course_id || null,
-        accommodation_id: form.accommodation_id || null,
-        check_in: form.check_in || null,
-        check_out: form.check_out || null,
-        total_amount: total,
-        notes: form.notes || null,
-      });
-      setForm({ diver_id: "", course_id: "", accommodation_id: "", check_in: "", check_out: "", notes: "" });
+      if (editingId) {
+        await apiClient.bookings.update(editingId, {
+          diver_id: form.diver_id,
+          course_id: form.course_id || null,
+          accommodation_id: form.accommodation_id || null,
+          check_in: form.check_in || null,
+          check_out: form.check_out || null,
+          total_amount: total,
+          payment_status: form.payment_status,
+          notes: form.notes || null,
+        });
+        toast({ title: "Success", description: "Booking updated successfully" });
+      } else {
+        await apiClient.bookings.create({
+          diver_id: form.diver_id,
+          course_id: form.course_id || null,
+          accommodation_id: form.accommodation_id || null,
+          check_in: form.check_in || null,
+          check_out: form.check_out || null,
+          total_amount: total,
+          notes: form.notes || null,
+        });
+        toast({ title: "Success", description: "Booking created successfully" });
+      }
       setOpen(false);
       load();
     } catch (err) {
@@ -82,7 +120,7 @@ export default function BookingsPage() {
   const togglePayment = async (id: string, current: string) => {
     const next = current === "paid" ? "unpaid" : "paid";
     try {
-      await apiClient.bookings.updateStatus(id, next);
+      await apiClient.bookings.update(id, { payment_status: next });
       load();
     } catch (err) {
       toast({ title: "Error", description: String(err), variant: "destructive" });
@@ -90,8 +128,10 @@ export default function BookingsPage() {
   };
 
   const handleDelete = async (id: string) => {
+    if (!confirm("Delete this booking?")) return;
     try {
       await apiClient.bookings.delete(id);
+      toast({ title: "Success", description: "Booking deleted" });
       load();
     } catch (err) {
       toast({ title: "Error", description: String(err), variant: "destructive" });
@@ -111,41 +151,72 @@ export default function BookingsPage() {
           <p className="page-description">Manage course bookings, accommodations, and payments</p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild><Button><Plus className="h-4 w-4 mr-2" />New Booking</Button></DialogTrigger>
+          <DialogTrigger asChild>
+            <Button onClick={() => handleOpenForm()}>
+              <Plus className="h-4 w-4 mr-2" />
+              New Booking
+            </Button>
+          </DialogTrigger>
           <DialogContent className="max-w-lg">
-            <DialogHeader><DialogTitle>New Booking</DialogTitle></DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label>Diver</Label>
+            <DialogHeader>
+              <DialogTitle>{editingId ? "Edit Booking" : "New Booking"}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label>Diver *</Label>
                 <Select value={form.diver_id} onValueChange={(v) => setForm({ ...form, diver_id: v })}>
                   <SelectTrigger><SelectValue placeholder="Select diver" /></SelectTrigger>
                   <SelectContent>{divers.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-              <div className="grid gap-2">
+              <div>
                 <Label>Course</Label>
                 <Select value={form.course_id} onValueChange={(v) => setForm({ ...form, course_id: v })}>
-                  <SelectTrigger><SelectValue placeholder="Select course" /></SelectTrigger>
-                  <SelectContent>{courses.map((c) => <SelectItem key={c.id} value={c.id}>{c.name} (${c.price})</SelectItem>)}</SelectContent>
+                  <SelectTrigger><SelectValue placeholder="Select course (optional)" /></SelectTrigger>
+                  <SelectContent><SelectItem value="">None</SelectItem>{courses.map((c) => <SelectItem key={c.id} value={c.id}>{c.name} (${c.price})</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-              <div className="grid gap-2">
+              <div>
                 <Label>Accommodation</Label>
                 <Select value={form.accommodation_id} onValueChange={(v) => setForm({ ...form, accommodation_id: v })}>
-                  <SelectTrigger><SelectValue placeholder="Select accommodation" /></SelectTrigger>
-                  <SelectContent>{accommodations.map((a) => <SelectItem key={a.id} value={a.id}>{a.name} ({a.tier === "free_with_course" ? "Free" : `$${a.price_per_night}/night`})</SelectItem>)}</SelectContent>
+                  <SelectTrigger><SelectValue placeholder="Select accommodation (optional)" /></SelectTrigger>
+                  <SelectContent><SelectItem value="">None</SelectItem>{accommodations.map((a) => <SelectItem key={a.id} value={a.id}>{a.name} ({a.tier === "free_with_course" ? "Free" : `$${a.price_per_night}/night`})</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2"><Label>Check In</Label><Input type="date" value={form.check_in} onChange={(e) => setForm({ ...form, check_in: e.target.value })} /></div>
-                <div className="grid gap-2"><Label>Check Out</Label><Input type="date" value={form.check_out} onChange={(e) => setForm({ ...form, check_out: e.target.value })} /></div>
+                <div>
+                  <Label>Check In</Label>
+                  <Input type="date" value={form.check_in} onChange={(e) => setForm({ ...form, check_in: e.target.value })} />
+                </div>
+                <div>
+                  <Label>Check Out</Label>
+                  <Input type="date" value={form.check_out} onChange={(e) => setForm({ ...form, check_out: e.target.value })} />
+                </div>
               </div>
-              <div className="grid gap-2"><Label>Notes</Label><Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
+              {editingId && (
+                <div>
+                  <Label>Payment Status</Label>
+                  <Select value={form.payment_status} onValueChange={(v) => setForm({ ...form, payment_status: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="unpaid">Unpaid</SelectItem>
+                      <SelectItem value="paid">Paid</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              <div>
+                <Label>Notes</Label>
+                <Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+              </div>
               <div className="bg-muted/50 rounded-md p-3 text-center">
                 <p className="text-sm text-muted-foreground">Estimated Total</p>
                 <p className="text-2xl font-bold">${calcTotal()}</p>
               </div>
-              <Button onClick={handleSubmit}>Create Booking & Invoice</Button>
+              <div className="flex gap-2 justify-end">
+                <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+                <Button onClick={handleSubmit}>{editingId ? "Update" : "Create"}</Button>
+              </div>
             </div>
           </DialogContent>
         </Dialog>
@@ -207,9 +278,14 @@ export default function BookingsPage() {
                     </Badge>
                   </td>
                   <td>
-                    <Button variant="ghost" size="icon" onClick={() => handleDelete(b.id)}>
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => handleOpenForm(b)}>
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => handleDelete(b.id)}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}

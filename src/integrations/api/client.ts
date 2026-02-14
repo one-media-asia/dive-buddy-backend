@@ -30,6 +30,9 @@ export const apiClient = {
   divers: {
     list: () => apiClient.request('GET', '/api/divers'),
     create: (payload) => apiClient.request('POST', '/api/divers', payload),
+    update: (id, payload) => apiClient.request('PUT', `/api/divers/${id}`, payload),
+    delete: (id) => apiClient.request('DELETE', `/api/divers/${id}`),
+    completeOnboarding: (id) => apiClient.request('PATCH', `/api/divers/${id}/onboarding`, {}),
   },
 
   courses: {
@@ -45,8 +48,15 @@ export const apiClient = {
   bookings: {
     list: () => apiClient.request('GET', '/api/bookings'),
     create: (payload) => apiClient.request('POST', '/api/bookings', payload),
+    update: (id, payload) => apiClient.request('PUT', `/api/bookings/${id}`, payload),
+    delete: (id) => apiClient.request('DELETE', `/api/bookings/${id}`),
     getLast30Days: () => apiClient.request('GET', '/api/bookings/stats/last30days'),
     updateStatus: (id, status) => apiClient.request('PATCH', `/api/bookings/${id}`, { payment_status: status }),
-    delete: (id) => apiClient.request('DELETE', `/api/bookings/${id}`),
+  },
+
+  waivers: {
+    list: () => apiClient.request('GET', '/api/waivers'),
+    get: (diverID) => apiClient.request('GET', `/api/waivers/${diverID}`),
+    create: (payload) => apiClient.request('POST', '/api/waivers', payload),
   },
 };

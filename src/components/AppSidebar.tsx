@@ -13,6 +13,7 @@ const links = [
   { to: "/courses", label: "Courses", icon: GraduationCap },
   { to: "/bookings", label: "Bookings & Invoices", icon: FileText },
   { to: "/accommodations", label: "Accommodations", icon: Home },
+  { to: "/waivers", label: "Waivers", icon: FileText },
   { to: "/incidents", label: "Incidents", icon: AlertTriangle },
   { to: "/groups", label: "Groups", icon: UserCheck },
   { to: "/emergency", label: "Emergency", icon: AlertTriangle },

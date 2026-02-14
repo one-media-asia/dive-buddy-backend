@@ -449,6 +449,219 @@ app.delete('/api/bookings/:id', (req, res) => {
   });
 });
 
+// PUT /api/divers/:id - update a diver
+app.put('/api/divers/:id', (req, res) => {
+  const { id } = req.params;
+  const { name, email, phone, certification_level, medical_cleared } = req.body;
+
+  if (!name || !email) {
+    return res.status(400).json({ error: 'name and email are required' });
+  }
+
+  const db = getDb();
+  db.run(
+    `UPDATE divers SET name = ?, email = ?, phone = ?, certification_level = ?, medical_cleared = ?, updated_at = CURRENT_TIMESTAMP
+     WHERE id = ?`,
+    [name, email, phone || null, certification_level || null, medical_cleared ? 1 : 0, id],
+    (err) => {
+      if (err) {
+        db.close();
+        return res.status(500).json({ error: err.message });
+      }
+
+      db.get('SELECT * FROM divers WHERE id = ?', [id], (err, diver) => {
+        db.close();
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(diver);
+      });
+    }
+  );
+});
+
+// DELETE /api/divers/:id - delete a diver
+app.delete('/api/divers/:id', (req, res) => {
+  const { id } = req.params;
+
+  const db = getDb();
+  db.run('DELETE FROM divers WHERE id = ?', [id], (err) => {
+    db.close();
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ ok: true });
+  });
+});
+
+// PUT /api/bookings/:id - update a booking
+app.put('/api/bookings/:id', (req, res) => {
+  const { id } = req.params;
+  const { diver_id, course_id, accommodation_id, check_in, check_out, total_amount, payment_status, notes } = req.body;
+
+  if (!diver_id) {
+    return res.status(400).json({ error: 'diver_id is required' });
+  }
+
+  const db = getDb();
+  db.run(
+    `UPDATE bookings SET diver_id = ?, course_id = ?, accommodation_id = ?, check_in = ?, check_out = ?, total_amount = ?, payment_status = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
+     WHERE id = ?`,
+    [diver_id, course_id || null, accommodation_id || null, check_in || null, check_out || null, total_amount || 0, payment_status || 'unpaid', notes || null, id],
+    (err) => {
+      if (err) {
+        db.close();
+        return res.status(500).json({ error: err.message });
+      }
+
+      db.get(`
+        SELECT 
+          b.id, b.diver_id, b.course_id, b.accommodation_id, b.check_in, b.check_out,
+          b.total_amount, b.invoice_number, b.payment_status, b.notes, b.created_at, b.updated_at,
+          d.name as diver_name,
+          c.name as course_name, c.price as course_price,
+          a.name as accommodation_name, a.price_per_night, a.tier
+        FROM bookings b
+        LEFT JOIN divers d ON b.diver_id = d.id
+        LEFT JOIN courses c ON b.course_id = c.id
+        LEFT JOIN accommodations a ON b.accommodation_id = a.id
+        WHERE b.id = ?
+      `, [id], (err, booking) => {
+        db.close();
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(booking);
+      });
+    }
+  );
+});
+
+// GET /api/waivers - list all waivers
+app.get('/api/waivers', (req, res) => {
+  const db = getDb();
+
+  db.all(`
+    SELECT w.id, w.diver_id, w.status, w.signed_at, w.notes, w.created_at, d.name as diver_name, d.email as diver_email
+    FROM waivers w
+    LEFT JOIN divers d ON w.diver_id = d.id
+    ORDER BY w.created_at DESC
+  `, (err, waivers) => {
+    db.close();
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(waivers || []);
+  });
+});
+
+// GET /api/waivers/:diver_id - get waiver for a specific diver
+app.get('/api/waivers/:diver_id', (req, res) => {
+  const { diver_id } = req.params;
+  const db = getDb();
+
+  db.get(`
+    SELECT w.id, w.diver_id, w.document_url, w.signature_data, w.status, w.signed_at, w.notes, w.created_at, d.name as diver_name, d.email as diver_email
+    FROM waivers w
+    LEFT JOIN divers d ON w.diver_id = d.id
+    WHERE w.diver_id = ?
+  `, [diver_id], (err, waiver) => {
+    db.close();
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(waiver || null);
+  });
+});
+
+// POST /api/waivers - create/update waiver
+app.post('/api/waivers', (req, res) => {
+  const { diver_id, document_url, signature_data, notes } = req.body;
+  const id = uuidv4();
+
+  if (!diver_id) {
+    return res.status(400).json({ error: 'diver_id is required' });
+  }
+
+  const db = getDb();
+
+  // Check if waiver exists for this diver
+  db.get('SELECT id FROM waivers WHERE diver_id = ?', [diver_id], (err, existing) => {
+    if (err) {
+      db.close();
+      return res.status(500).json({ error: err.message });
+    }
+
+    if (existing) {
+      // Update existing waiver
+      db.run(
+        `UPDATE waivers SET document_url = ?, signature_data = ?, status = 'signed', signed_at = CURRENT_TIMESTAMP, notes = ?
+         WHERE diver_id = ?`,
+        [document_url || null, signature_data || null, notes || null, diver_id],
+        (err) => {
+          if (err) {
+            db.close();
+            return res.status(500).json({ error: err.message });
+          }
+
+          // Also update diver's waiver_signed flag
+          db.run(
+            `UPDATE divers SET waiver_signed = 1, waiver_signed_date = CURRENT_TIMESTAMP WHERE id = ?`,
+            [diver_id],
+            (err) => {
+              db.get('SELECT * FROM waivers WHERE diver_id = ?', [diver_id], (err, waiver) => {
+                db.close();
+                if (err) return res.status(500).json({ error: err.message });
+                res.json(waiver);
+              });
+            }
+          );
+        }
+      );
+    } else {
+      // Create new waiver
+      db.run(
+        `INSERT INTO waivers (id, diver_id, document_url, signature_data, status, signed_at, notes)
+         VALUES (?, ?, ?, ?, 'signed', CURRENT_TIMESTAMP, ?)`,
+        [id, diver_id, document_url || null, signature_data || null, notes || null],
+        (err) => {
+          if (err) {
+            db.close();
+            return res.status(500).json({ error: err.message });
+          }
+
+          // Update diver's waiver_signed flag
+          db.run(
+            `UPDATE divers SET waiver_signed = 1, waiver_signed_date = CURRENT_TIMESTAMP WHERE id = ?`,
+            [diver_id],
+            (err) => {
+              db.get('SELECT * FROM waivers WHERE id = ?', [id], (err, waiver) => {
+                db.close();
+                if (err) return res.status(500).json({ error: err.message });
+                res.json(waiver);
+              });
+            }
+          );
+        }
+      );
+    }
+  });
+});
+
+// PATCH /api/divers/:id/onboarding - complete onboarding
+app.patch('/api/divers/:id/onboarding', (req, res) => {
+  const { id } = req.params;
+  const db = getDb();
+
+  db.run(
+    `UPDATE divers SET onboarding_completed = 1, onboarding_date = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+     WHERE id = ?`,
+    [id],
+    (err) => {
+      if (err) {
+        db.close();
+        return res.status(500).json({ error: err.message });
+      }
+
+      db.get('SELECT * FROM divers WHERE id = ?', [id], (err, diver) => {
+        db.close();
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(diver);
+      });
+    }
+  );
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
