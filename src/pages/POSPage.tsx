@@ -31,6 +31,7 @@ export default function POSPage() {
   const [selectedDiverId, setSelectedDiverId] = useState("");
   const [selectedBookingId, setSelectedBookingId] = useState("");
   const [bookingsList, setBookingsList] = useState<Array<{ id: string; label: string }>>([]);
+  const [diversList, setDiversList] = useState<Array<{ id: string; name: string }>>([]);
   const [tax, setTax] = useState(0);
   const [discount, setDiscount] = useState(0);
   const [notes, setNotes] = useState("");
@@ -49,6 +50,7 @@ export default function POSPage() {
     loadTransactions();
     loadPayments();
     loadBookings();
+    loadDivers();
     loadSummary();
   }, []);
 
@@ -64,6 +66,17 @@ export default function POSPage() {
       setBookingsList(items);
     } catch (err) {
       console.error("Failed to load bookings:", err);
+    }
+  };
+
+  const loadDivers = async () => {
+    try {
+      const res = await fetch('/api/divers');
+      if (!res.ok) return;
+      const data = await res.json();
+      setDiversList(data || []);
+    } catch (err) {
+      console.error('Failed to load divers', err);
     }
   };
 
@@ -336,7 +349,17 @@ export default function POSPage() {
                     <div className="border-t pt-4 space-y-3">
                       <div>
                         <Label>Diver (Optional)</Label>
-                        <Input placeholder="Diver name or ID" value={selectedDiverId} onChange={(e) => setSelectedDiverId(e.target.value)} />
+                        <Select value={selectedDiverId} onValueChange={setSelectedDiverId}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select diver..." />
+                          </SelectTrigger>
+                          <SelectContent className="z-50 max-h-40 overflow-y-auto">
+                            <SelectItem value="">None</SelectItem>
+                            {diversList.map(d => (
+                              <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                       <div>
                         <Label>Booking (Optional)</Label>
