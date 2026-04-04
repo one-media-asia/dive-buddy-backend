@@ -128,7 +128,7 @@ export const apiClient = {
       const waiverMap = new Map((waivers || []).map((w: any) => [w.diver_id, w]));
 
       return (divers || []).map((d: any) => {
-        const w = waiverMap.get(d.id);
+        const w: any = waiverMap.get(d.id);
         return {
           id: w?.id || d.id,
           diver_id: d.id,
