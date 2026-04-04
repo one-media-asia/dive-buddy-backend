@@ -8,10 +8,41 @@ function throwOnError<T>({ data, error }: { data: T; error: any }): T {
 
 export const apiClient = {
   groups: {
-    list: async () => [] as any[],
-    create: async (_payload: any) => ({}),
-    addMember: async (_groupId: string, _payload: any) => ({}),
-    removeMember: async (_groupId: string, _memberId: string) => ({}),
+    list: async () => {
+      const { data: groups, error } = await (supabase as any).from("groups")
+        .select("*, leader:divers!groups_leader_id_fkey(id, name), course:courses(id, name, price)")
+        .order("created_at", { ascending: false });
+      if (error) throw new Error(error.message);
+
+      // Fetch members for each group
+      const groupIds = (groups || []).map((g: any) => g.id);
+      let members: any[] = [];
+      if (groupIds.length > 0) {
+        const { data: m } = await (supabase as any).from("group_members")
+          .select("*, diver:divers(id, name)")
+          .in("group_id", groupIds);
+        members = m || [];
+      }
+
+      return (groups || []).map((g: any) => ({
+        ...g,
+        members: members.filter((m: any) => m.group_id === g.id),
+      }));
+    },
+    create: async (payload: any) => throwOnError(await (supabase as any).from("groups").insert({
+      name: payload.name,
+      type: payload.type || 'fundive',
+      leader_id: payload.leader_id || null,
+      course_id: payload.course_id || null,
+      days: payload.days || null,
+      description: payload.description || null,
+    }).select().single()),
+    addMember: async (groupId: string, payload: any) => throwOnError(await (supabase as any).from("group_members").insert({
+      group_id: groupId,
+      diver_id: payload.diver_id,
+      role: payload.role || null,
+    }).select().single()),
+    removeMember: async (_groupId: string, memberId: string) => throwOnError(await (supabase as any).from("group_members").delete().eq("id", memberId)),
   },
 
   divers: {
@@ -90,9 +121,37 @@ export const apiClient = {
   },
 
   waivers: {
-    list: async () => [] as any[],
-    get: async (_diverID: string) => null,
-    create: async (_payload: any) => ({}),
+    list: async () => {
+      // Get all divers, then check which have signed waivers
+      const { data: divers } = await supabase.from("divers").select("id, name, email");
+      const { data: waivers } = await (supabase as any).from("waivers").select("*");
+      const waiverMap = new Map((waivers || []).map((w: any) => [w.diver_id, w]));
+
+      return (divers || []).map((d: any) => {
+        const w = waiverMap.get(d.id);
+        return {
+          id: w?.id || d.id,
+          diver_id: d.id,
+          diver_name: d.name,
+          diver_email: d.email,
+          status: w ? 'signed' : 'pending',
+          signed_at: w?.signed_at || null,
+          signature_data: w?.signature_data || null,
+          created_at: w?.created_at || d.created_at,
+        };
+      });
+    },
+    get: async (diverId: string) => {
+      const { data } = await (supabase as any).from("waivers").select("*").eq("diver_id", diverId).maybeSingle();
+      return data;
+    },
+    create: async (payload: any) => throwOnError(await (supabase as any).from("waivers").insert({
+      diver_id: payload.diver_id,
+      status: 'signed',
+      signature_data: payload.signature_data,
+      signed_at: new Date().toISOString(),
+      notes: payload.notes || null,
+    }).select().single()),
   },
 
   diveSites: {
@@ -102,30 +161,73 @@ export const apiClient = {
   },
 
   groupItinerary: {
-    get: async (_groupId: string) => [] as any[],
-    updateDay: async (_groupId: string, _payload: any) => ({}),
+    get: async (groupId: string) => {
+      const { data, error } = await (supabase as any).from("group_itinerary")
+        .select("*, dive_sites(name, location, max_depth, difficulty)")
+        .eq("group_id", groupId)
+        .order("day_number", { ascending: true });
+      if (error) throw new Error(error.message);
+      return (data || []).map((item: any) => ({
+        ...item,
+        site_name: item.dive_sites?.name || null,
+        location: item.dive_sites?.location || null,
+        max_depth: item.dive_sites?.max_depth || null,
+        difficulty: item.dive_sites?.difficulty || null,
+      }));
+    },
+    updateDay: async (groupId: string, payload: any) => {
+      // Upsert: insert or update based on group_id + day_number
+      const { data: existing } = await (supabase as any).from("group_itinerary")
+        .select("id")
+        .eq("group_id", groupId)
+        .eq("day_number", payload.day_number)
+        .maybeSingle();
+
+      if (existing) {
+        return throwOnError(await (supabase as any).from("group_itinerary")
+          .update({ dive_site_id: payload.dive_site_id })
+          .eq("id", existing.id)
+          .select().single());
+      } else {
+        return throwOnError(await (supabase as any).from("group_itinerary").insert({
+          group_id: groupId,
+          day_number: payload.day_number,
+          dive_site_id: payload.dive_site_id,
+        }).select().single());
+      }
+    },
   },
 
   equipment: {
-    list: async () => [] as any[],
-    get: async (_id: string) => null,
-    create: async (_payload: any) => ({}),
-    update: async (_id: string, _payload: any) => ({}),
-    delete: async (_id: string) => ({}),
+    list: async () => {
+      const { data, error } = await (supabase as any).from("equipment").select("*").order("created_at", { ascending: false });
+      return { data: data || [], error };
+    },
+    get: async (id: string) => throwOnError(await (supabase as any).from("equipment").select("*").eq("id", id).single()),
+    create: async (payload: any) => throwOnError(await (supabase as any).from("equipment").insert(payload).select().single()),
+    update: async (id: string, payload: any) => throwOnError(await (supabase as any).from("equipment").update(payload).eq("id", id).select().single()),
+    delete: async (id: string) => throwOnError(await (supabase as any).from("equipment").delete().eq("id", id)),
   },
 
   transactions: {
-    list: async () => [] as any[],
-    get: async (_id: string) => null,
-    create: async (_payload: any) => ({}),
+    list: async () => throwOnError(await (supabase as any).from("transactions").select("*, equipment(name), divers(name)").order("created_at", { ascending: false })),
+    get: async (id: string) => throwOnError(await (supabase as any).from("transactions").select("*").eq("id", id).single()),
+    create: async (payload: any) => throwOnError(await (supabase as any).from("transactions").insert(payload).select().single()),
   },
 
   payments: {
-    list: async () => [] as any[],
-    create: async (_payload: any) => ({}),
+    list: async () => throwOnError(await (supabase as any).from("payments").select("*, bookings(diver_id, divers(name))").order("created_at", { ascending: false })),
+    create: async (payload: any) => throwOnError(await (supabase as any).from("payments").insert(payload).select().single()),
   },
 
   pos: {
-    getSummary: async () => ({ total_revenue: 0, total_transactions: 0 }),
+    getSummary: async () => {
+      const { data: txns } = await (supabase as any).from("transactions").select("total_price");
+      const rows = txns || [];
+      return {
+        total_revenue: rows.reduce((sum: number, t: any) => sum + Number(t.total_price || 0), 0),
+        total_transactions: rows.length,
+      };
+    },
   },
 };
