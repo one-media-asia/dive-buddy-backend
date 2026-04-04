@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
+const sb = supabase as any;
+
 export function useHira(siteId?: string) {
   const [assessments, setAssessments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -9,7 +11,7 @@ export function useHira(siteId?: string) {
     let mounted = true;
     (async () => {
       setLoading(true);
-      let q = supabase.from('hazard_assessments').select('*').order('assessed_at', { ascending: false });
+      let q = sb.from('hazard_assessments').select('*').order('assessed_at', { ascending: false });
       if (siteId) q = q.eq('site_id', siteId);
       const { data } = await q;
       if (!mounted) return;
@@ -20,7 +22,7 @@ export function useHira(siteId?: string) {
   }, [siteId]);
 
   async function createAssessment(payload: { site_id?: string; assessor_id?: string; risk_level?: string; hazards?: any; mitigations?: any; notes?: string }) {
-    const { data, error } = await supabase.from('hazard_assessments').insert([{
+    const { data, error } = await sb.from('hazard_assessments').insert([{
       site_id: payload.site_id ?? null,
       assessor_id: payload.assessor_id ?? null,
       risk_level: payload.risk_level ?? null,
@@ -29,7 +31,7 @@ export function useHira(siteId?: string) {
       notes: payload.notes ?? null,
     }]).select().single();
     if (!error) {
-      setAssessments((s) => [data, ...s]);
+      setAssessments((s: any[]) => [data, ...s]);
     }
     return { data, error };
   }

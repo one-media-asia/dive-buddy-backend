@@ -4,17 +4,21 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import WaiverForm from '@/components/WaiverForm';
 
+const sb = supabase as any;
+
 export default function TripBooking() {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  const { data: trip } = useQuery(['trip', id], async () => {
-    const { data } = await supabase.from('trips').select('*').eq('id', id).single();
-    return data;
+  const { data: trip } = useQuery({
+    queryKey: ['trip', id],
+    queryFn: async () => {
+      const { data } = await sb.from('trips').select('*').eq('id', id).single();
+      return data;
+    },
   });
 
   async function handleBook() {
-    // call edge function via supabase functions invoke
     const body = { trip_id: id };
     const res = await supabase.functions.invoke('book-trip', { body: JSON.stringify(body) });
     if (res.error) {
@@ -31,15 +35,13 @@ export default function TripBooking() {
       {trip ? (
         <div className="space-y-4">
           <div className="p-4 border rounded">
-            <div className="font-semibold">{trip.name}</div>
-            <div className="text-sm text-muted-foreground">{new Date(trip.start_at).toLocaleString()}</div>
-            <div className="mt-2">Capacity: {trip.capacity}</div>
+            <div className="font-semibold">{(trip as any).name}</div>
+            <div className="text-sm text-muted-foreground">{new Date((trip as any).start_at).toLocaleString()}</div>
+            <div className="mt-2">Capacity: {(trip as any).capacity}</div>
           </div>
-
           <div className="p-4 border rounded">
             <WaiverForm />
           </div>
-
           <div>
             <button onClick={handleBook} className="btn primary">Reserve Spot</button>
           </div>

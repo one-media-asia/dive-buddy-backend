@@ -1,6 +1,8 @@
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import useIncidents from '@/hooks/useIncidents';
 import { supabase } from '@/integrations/supabase/client';
+
+const sb = supabase as any;
 
 export default function IncidentForm({ onCreated }: { onCreated?: (inc: any) => void }) {
   const { createIncident, uploadAttachment } = useIncidents();
@@ -23,8 +25,7 @@ export default function IncidentForm({ onCreated }: { onCreated?: (inc: any) => 
       if (upErr) {
         console.warn('attachment upload failed', upErr);
       } else if (publicUrl) {
-        // update incident record to include attachment URL in actions_taken or separate field
-        await supabase.from('incidents').update({ actions_taken: [{ text: form.actions_taken }, { attachment: publicUrl }] }).eq('id', incident.id);
+        await sb.from('incidents').update({ actions_taken: [{ text: form.actions_taken }, { attachment: publicUrl }] }).eq('id', incident.id);
       }
     }
     setForm({ dive_log_id: '', description: '', severity: 'medium', actions_taken: '' });

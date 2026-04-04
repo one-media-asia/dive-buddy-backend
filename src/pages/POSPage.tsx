@@ -491,7 +491,7 @@ export default function POSPage() {
                 <div className="grid grid-cols-3 gap-4">
                   <div>
                     <Label>Can Buy?</Label>
-                    <Select value={equipmentForm.can_buy ? "yes" : "no"} onValueChange={(val) => setEquipmentForm({ ...equipmentForm, can_buy: val === "yes" })}>
+                    <Select value={equipmentForm.can_buy ? "yes" : "no"} onValueChange={(val) => setEquipmentForm({ ...equipmentForm, can_buy: val === "yes" ? 1 : 0 })}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -503,7 +503,7 @@ export default function POSPage() {
                   </div>
                   <div>
                     <Label>Can Rent?</Label>
-                    <Select value={equipmentForm.can_rent ? "yes" : "no"} onValueChange={(val) => setEquipmentForm({ ...equipmentForm, can_rent: val === "yes" })}>
+                    <Select value={equipmentForm.can_rent ? "yes" : "no"} onValueChange={(val) => setEquipmentForm({ ...equipmentForm, can_rent: val === "yes" ? 1 : 0 })}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
