@@ -503,7 +503,7 @@ export default function POSPage() {
                   </div>
                   <div>
                     <Label>Can Rent?</Label>
-                    <Select value={equipmentForm.can_rent ? "yes" : "no"} onValueChange={(val) => setEquipmentForm({ ...equipmentForm, can_rent: val === "yes" ? 1 : 0 })}>>
+                    <Select value={equipmentForm.can_rent ? "yes" : "no"} <Select value={equipmentForm.can_rent ? "yes" : "no"} onValueChange={(val) => setEquipmentForm({ ...equipmentForm, can_rent: val === "yes" ? 1 : 0 })}>>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
