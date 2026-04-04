@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import jsPDF from 'jspdf';
 
+const sb = supabase as any;
+
 export function useWaiver() {
   const [loading, setLoading] = useState(false);
 
@@ -17,14 +19,12 @@ export function useWaiver() {
       doc.text(values.medical_notes ?? 'None', 40, 160, { maxWidth: 500 });
 
       if (signatureDataUrl) {
-        // insert signature image near bottom
         doc.text('Signature:', 40, 500);
         doc.addImage(signatureDataUrl, 'PNG', 120, 480, 200, 60);
       }
 
       const pdfBlob = doc.output('blob');
 
-      // ensure we have a diver row: try match by email
       let diverId: string | null = null;
       if (values.email) {
         const { data: existing } = await supabase.from('divers').select('id').eq('email', values.email).limit(1).maybeSingle();
@@ -32,7 +32,6 @@ export function useWaiver() {
       }
 
       if (!diverId) {
-        // create a minimal diver record
         const { data: newDiver } = await supabase.from('divers').insert([{ name: values.name, email: values.email }]).select().single();
         diverId = newDiver?.id ?? null;
       }
@@ -45,8 +44,7 @@ export function useWaiver() {
         publicUrl = urlData.publicUrl ?? null;
       }
 
-      // create waiver record
-      const { error: wErr } = await supabase.from('waivers').insert([{ diver_id: diverId, form_data: values, signature_image_url: signatureDataUrl, pdf_url: publicUrl }]);
+      const { error: wErr } = await sb.from('waivers').insert([{ diver_id: diverId, form_data: values, signature_image_url: signatureDataUrl, pdf_url: publicUrl }]);
       if (wErr) throw wErr;
 
       setLoading(false);

@@ -1,11 +1,11 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from 'npm:@supabase/supabase-js@2';
 
 // This is a simple Supabase Edge Function scaffold that accepts auth webhook
 // payloads and upserts a `profiles` row using a service-role key.
 // Configure `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in the function env.
 
-const SUPABASE_URL = Deno?.env?.get('SUPABASE_URL') ?? process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = Deno?.env?.get('SUPABASE_SERVICE_ROLE_KEY') ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   // eslint-disable-next-line no-console

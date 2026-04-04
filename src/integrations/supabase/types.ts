@@ -365,6 +365,171 @@ export type Database = {
         }
         Relationships: []
       }
+      equipment: {
+        Row: {
+          buy_price: number
+          can_buy: boolean
+          can_rent: boolean
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          quantity: number
+          rent_price_per_day: number
+        }
+        Insert: {
+          buy_price?: number
+          can_buy?: boolean
+          can_rent?: boolean
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          quantity?: number
+          rent_price_per_day?: number
+        }
+        Update: {
+          buy_price?: number
+          can_buy?: boolean
+          can_rent?: boolean
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          quantity?: number
+          rent_price_per_day?: number
+        }
+        Relationships: []
+      }
+      group_itinerary: {
+        Row: {
+          created_at: string
+          day_number: number
+          dive_site_id: string | null
+          group_id: string
+          id: string
+          notes: string | null
+        }
+        Insert: {
+          created_at?: string
+          day_number: number
+          dive_site_id?: string | null
+          group_id: string
+          id?: string
+          notes?: string | null
+        }
+        Update: {
+          created_at?: string
+          day_number?: number
+          dive_site_id?: string | null
+          group_id?: string
+          id?: string
+          notes?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_itinerary_dive_site_id_fkey"
+            columns: ["dive_site_id"]
+            isOneToOne: false
+            referencedRelation: "dive_sites"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_itinerary_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      group_members: {
+        Row: {
+          created_at: string
+          diver_id: string
+          group_id: string
+          id: string
+          role: string | null
+        }
+        Insert: {
+          created_at?: string
+          diver_id: string
+          group_id: string
+          id?: string
+          role?: string | null
+        }
+        Update: {
+          created_at?: string
+          diver_id?: string
+          group_id?: string
+          id?: string
+          role?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_members_diver_id_fkey"
+            columns: ["diver_id"]
+            isOneToOne: false
+            referencedRelation: "divers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_members_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      groups: {
+        Row: {
+          course_id: string | null
+          created_at: string
+          days: number | null
+          description: string | null
+          id: string
+          leader_id: string | null
+          name: string
+          type: string
+        }
+        Insert: {
+          course_id?: string | null
+          created_at?: string
+          days?: number | null
+          description?: string | null
+          id?: string
+          leader_id?: string | null
+          name: string
+          type?: string
+        }
+        Update: {
+          course_id?: string | null
+          created_at?: string
+          days?: number | null
+          description?: string | null
+          id?: string
+          leader_id?: string | null
+          name?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "groups_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "groups_leader_id_fkey"
+            columns: ["leader_id"]
+            isOneToOne: false
+            referencedRelation: "divers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       instructors: {
         Row: {
           certification: string | null
@@ -392,6 +557,44 @@ export type Database = {
         }
         Relationships: []
       }
+      payments: {
+        Row: {
+          amount: number
+          booking_id: string | null
+          created_at: string
+          id: string
+          method: string
+          notes: string | null
+          paid_at: string
+        }
+        Insert: {
+          amount?: number
+          booking_id?: string | null
+          created_at?: string
+          id?: string
+          method?: string
+          notes?: string | null
+          paid_at?: string
+        }
+        Update: {
+          amount?: number
+          booking_id?: string | null
+          created_at?: string
+          id?: string
+          method?: string
+          notes?: string | null
+          paid_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -412,6 +615,92 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      transactions: {
+        Row: {
+          created_at: string
+          diver_id: string | null
+          equipment_id: string | null
+          id: string
+          notes: string | null
+          quantity: number
+          total_price: number
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          diver_id?: string | null
+          equipment_id?: string | null
+          id?: string
+          notes?: string | null
+          quantity?: number
+          total_price?: number
+          type?: string
+        }
+        Update: {
+          created_at?: string
+          diver_id?: string | null
+          equipment_id?: string | null
+          id?: string
+          notes?: string | null
+          quantity?: number
+          total_price?: number
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_diver_id_fkey"
+            columns: ["diver_id"]
+            isOneToOne: false
+            referencedRelation: "divers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: false
+            referencedRelation: "equipment"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      waivers: {
+        Row: {
+          created_at: string
+          diver_id: string
+          id: string
+          notes: string | null
+          signature_data: string | null
+          signed_at: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          diver_id: string
+          id?: string
+          notes?: string | null
+          signature_data?: string | null
+          signed_at?: string | null
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          diver_id?: string
+          id?: string
+          notes?: string | null
+          signature_data?: string | null
+          signed_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "waivers_diver_id_fkey"
+            columns: ["diver_id"]
+            isOneToOne: false
+            referencedRelation: "divers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
