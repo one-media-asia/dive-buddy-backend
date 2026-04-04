@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from 'npm:@supabase/supabase-js@2';
 
 // Edge Function to trigger server-side metrics refresh using service role key.
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
