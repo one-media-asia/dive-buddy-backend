@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from 'npm:@supabase/supabase-js@2';
 
 // This is a simple Supabase Edge Function scaffold that accepts auth webhook
 // payloads and upserts a `profiles` row using a service-role key.
