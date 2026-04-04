@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
+const sb = supabase as any;
+
 export function useTrips() {
   const [trips, setTrips] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -9,7 +11,7 @@ export function useTrips() {
     let mounted = true;
     async function load() {
       setLoading(true);
-      const { data, error } = await supabase.from('trips').select('*').order('start_at', { ascending: true });
+      const { data, error } = await sb.from('trips').select('*').order('start_at', { ascending: true });
       if (!mounted) return;
       if (!error && data) setTrips(data);
       setLoading(false);

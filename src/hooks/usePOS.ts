@@ -1,6 +1,8 @@
 import { supabase } from '@/integrations/supabase/client';
 import jsPDF from 'jspdf';
 
+const sb = supabase as any;
+
 export interface Equipment {
   id: string;
   name: string;
@@ -76,13 +78,11 @@ export interface POSSummary {
   low_stock_items: Equipment[];
 }
 
-// Legacy Supabase functions
 export async function fetchTopItems(days = 30, limit = 5) {
-  const { data } = await supabase.rpc('pos_top_items', { days, limit_val: limit });
+  const { data } = await sb.rpc('pos_top_items', { days, limit_val: limit });
   return data || [];
 }
 
-// Equipment operations
 export const equipment = {
   list: async () => {
     const response = await fetch('/api/equipment');
@@ -90,14 +90,12 @@ export const equipment = {
     const data = await response.json();
     return { data, error: null };
   },
-
   get: async (id: string) => {
     const response = await fetch(`/api/equipment/${id}`);
     if (!response.ok) throw new Error(`Failed to load equipment: ${response.status}`);
     const data = await response.json();
     return { data, error: null };
   },
-
   create: async (item: Partial<Equipment>) => {
     const response = await fetch('/api/equipment', {
       method: 'POST',
@@ -108,7 +106,6 @@ export const equipment = {
     const data = await response.json();
     return { data, error: null };
   },
-
   update: async (id: string, item: Partial<Equipment>) => {
     const response = await fetch(`/api/equipment/${id}`, {
       method: 'PUT',
@@ -119,18 +116,14 @@ export const equipment = {
     const data = await response.json();
     return { data, error: null };
   },
-
   delete: async (id: string) => {
-    const response = await fetch(`/api/equipment/${id}`, {
-      method: 'DELETE',
-    });
+    const response = await fetch(`/api/equipment/${id}`, { method: 'DELETE' });
     if (!response.ok) throw new Error(`Failed to delete equipment: ${response.status}`);
     const data = await response.json();
     return { data, error: null };
   },
 };
 
-// Transaction operations
 export const transactions = {
   list: async () => {
     const response = await fetch('/api/transactions');
@@ -138,14 +131,12 @@ export const transactions = {
     const data = await response.json();
     return { data, error: null };
   },
-
   get: async (id: string) => {
     const response = await fetch(`/api/transactions/${id}`);
     if (!response.ok) throw new Error(`Failed to load transaction: ${response.status}`);
     const data = await response.json();
     return { data, error: null };
   },
-
   create: async (transaction: {
     diver_id?: string;
     booking_id?: string;
@@ -165,7 +156,6 @@ export const transactions = {
   },
 };
 
-// Payment operations
 export const payments = {
   list: async () => {
     const response = await fetch('/api/payments');
@@ -173,7 +163,6 @@ export const payments = {
     const data = await response.json();
     return { data, error: null };
   },
-
   create: async (payment: {
     transaction_id: string;
     amount: number;
@@ -192,7 +181,6 @@ export const payments = {
   },
 };
 
-// POS summary
 export const pos = {
   getSummary: async () => {
     const response = await fetch('/api/pos/summary');
@@ -202,7 +190,6 @@ export const pos = {
   },
 };
 
-// Rental assignments
 export const rentalAssignments = {
   list: async (bookingId?: string) => {
     const url = bookingId ? `/api/rental-assignments?booking_id=${bookingId}` : '/api/rental-assignments';
@@ -211,7 +198,6 @@ export const rentalAssignments = {
     const data = await response.json();
     return { data, error: null };
   },
-
   create: async (assignment: {
     booking_id: string;
     equipment_id: string;
@@ -229,18 +215,14 @@ export const rentalAssignments = {
     const data = await response.json();
     return { data, error: null };
   },
-
   delete: async (id: string) => {
-    const response = await fetch(`/api/rental-assignments/${id}`, {
-      method: 'DELETE',
-    });
+    const response = await fetch(`/api/rental-assignments/${id}`, { method: 'DELETE' });
     if (!response.ok) throw new Error(`Failed to delete rental assignment: ${response.status}`);
     const data = await response.json();
     return { data, error: null };
   },
 };
 
-// Export functions
 export function exportToCSV(rows: any[], filename = 'export.csv') {
   if (!rows || !rows.length) return;
   const keys = Object.keys(rows[0]);
@@ -266,10 +248,7 @@ export function exportToPDF(title: string, rows: any[], filename = 'export.pdf')
     const line = Object.values(r).join(' | ');
     doc.text(line, 40, y);
     y += 16;
-    if (y > 740) {
-      doc.addPage();
-      y = 40;
-    }
+    if (y > 740) { doc.addPage(); y = 40; }
   });
   doc.save(filename);
 }
