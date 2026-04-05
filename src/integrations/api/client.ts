@@ -94,30 +94,48 @@ export const apiClient = {
   },
 
   bookings: {
-    list: async () => throwOnError(await supabase.from("bookings").select("*, divers(name), courses(name, price), accommodations(name, price_per_night, tier)").order("created_at", { ascending: false })),
-    create: async (payload: any) => throwOnError(await supabase.from("bookings").insert({
-      diver_id: payload.diver_id,
-      course_id: payload.course_id || null,
-      accommodation_id: payload.accommodation_id || null,
-      check_in: payload.check_in || null,
-      check_out: payload.check_out || null,
-      total_amount: payload.total_amount || 0,
-      notes: payload.notes || null,
-    }).select().single()),
-    update: async (id: string, payload: any) => throwOnError(await supabase.from("bookings").update(payload).eq("id", id).select().single()),
-    delete: async (id: string) => throwOnError(await supabase.from("bookings").delete().eq("id", id)),
-    getLast30Days: async () => {
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      const { data } = await supabase.from("bookings").select("total_amount").gte("created_at", thirtyDaysAgo.toISOString());
-      const rows = data || [];
-      return {
-        booking_count: rows.length,
-        total_revenue: rows.reduce((sum: number, b: any) => sum + Number(b.total_amount || 0), 0),
-        total_amount: rows.reduce((sum: number, b: any) => sum + Number(b.total_amount || 0), 0),
-      };
+    list: async () => {
+      const res = await fetch("/api/bookings");
+      if (!res.ok) throw new Error("Failed to fetch bookings");
+      return await res.json();
     },
-    updateStatus: async (id: string, status: string) => throwOnError(await supabase.from("bookings").update({ payment_status: status }).eq("id", id)),
+    create: async (payload: any) => {
+      const res = await fetch("/api/bookings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error("Failed to create booking");
+      return await res.json();
+    },
+    update: async (id: string, payload: any) => {
+      const res = await fetch(`/api/bookings/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error("Failed to update booking");
+      return await res.json();
+    },
+    delete: async (id: string) => {
+      const res = await fetch(`/api/bookings/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete booking");
+      return await res.json();
+    },
+    getLast30Days: async () => {
+      const res = await fetch("/api/bookings/stats/last30days");
+      if (!res.ok) throw new Error("Failed to fetch booking stats");
+      return await res.json();
+    },
+    updateStatus: async (id: string, status: string) => {
+      const res = await fetch(`/api/bookings/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ payment_status: status }),
+      });
+      if (!res.ok) throw new Error("Failed to update payment status");
+      return await res.json();
+    },
   },
 
   waivers: {
