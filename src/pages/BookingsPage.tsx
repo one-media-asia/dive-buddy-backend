@@ -423,7 +423,9 @@ export default function BookingsPage() {
                     <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent className="z-50">
                         <SelectItem value="unpaid">Unpaid</SelectItem>
+                        <SelectItem value="partial">Partial</SelectItem>
                         <SelectItem value="paid">Paid</SelectItem>
+                        <SelectItem value="refunded">Refunded</SelectItem>
                       </SelectContent>
                   </Select>
                 </div>
