@@ -35,8 +35,11 @@ export function useIncidents() {
     const path = `incident-attachments/${incidentId}/${Date.now()}_${file.name}`;
     const { error: uploadErr } = await supabase.storage.from('incident-attachments').upload(path, file, { upsert: true });
     if (uploadErr) return { error: uploadErr };
-    const { data: urlData } = supabase.storage.from('incident-attachments').getPublicUrl(path);
-    return { publicUrl: urlData?.publicUrl ?? null };
+    // Bucket is private; issue a short-lived signed URL instead of a public URL.
+    const { data: urlData } = await supabase.storage
+      .from('incident-attachments')
+      .createSignedUrl(path, 60 * 60); // 1 hour
+    return { publicUrl: urlData?.signedUrl ?? null };
   }
 
   async function resolveIncident(id: string) {
