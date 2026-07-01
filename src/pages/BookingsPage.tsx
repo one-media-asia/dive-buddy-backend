@@ -499,7 +499,7 @@ export default function BookingsPage() {
               </div>
               <div className="flex gap-2 justify-end">
                 <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-                <Button onClick={handleSubmit}>{editingId ? "Update" : "Create"}</Button>
+                <Button onClick={handleSubmit} disabled={submitting}>{submitting ? "Saving…" : editingId ? "Update" : "Create"}</Button>
               </div>
             </div>
           </DialogContent>
