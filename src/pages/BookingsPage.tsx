@@ -86,6 +86,8 @@ export default function BookingsPage() {
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ booking_type: "course", diver_id: "", group_id: "", course_id: "", accommodation_id: "", check_in: "", check_out: "", payment_status: "unpaid", notes: "" });
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
   const [selectedEquipment, setSelectedEquipment] = useState<Array<{ equipment_id: string; quantity: number }>>([]);
   const [rentalAssignmentsList, setRentalAssignmentsList] = useState<any[]>([]);
   const { toast } = useToast();
