@@ -1,16 +1,78 @@
 import { useState, useEffect } from "react";
+import { z } from "zod";
 import { Plus, Trash2, Edit2, FileText, Download, Printer, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/integrations/api/client";
 import { generateInvoicePDF, printInvoice } from "@/utils/invoiceGenerator";
 import { equipment, rentalAssignments } from "@/hooks/usePOS";
+
+const PAYMENT_STATUSES = ["unpaid", "partial", "paid", "refunded"] as const;
+type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
+
+// Accepts empty string or an ISO-ish YYYY-MM-DD date. Empty string means "no date".
+const dateOrEmpty = z
+  .string()
+  .refine((v) => v === "" || !Number.isNaN(new Date(v).getTime()), {
+    message: "Invalid date",
+  });
+
+const bookingSchema = z
+  .object({
+    booking_type: z.enum(["course", "fun_dive"]),
+    diver_id: z.string().uuid({ message: "Diver is required" }),
+    group_id: z.string().uuid().or(z.literal("")),
+    course_id: z.string().uuid().or(z.literal("")),
+    accommodation_id: z.string().uuid().or(z.literal("")),
+    check_in: dateOrEmpty,
+    check_out: dateOrEmpty,
+    payment_status: z.enum(PAYMENT_STATUSES),
+    notes: z.string().max(500, { message: "Notes must be under 500 characters" }),
+  })
+  .superRefine((val, ctx) => {
+    if (val.booking_type === "course" && !val.course_id) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["course_id"],
+        message: "Course is required for a course booking",
+      });
+    }
+    if (val.booking_type === "fun_dive" && !val.group_id) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["group_id"],
+        message: "Group is required for a fun dive booking",
+      });
+    }
+    if (val.check_in && val.check_out) {
+      if (new Date(val.check_out).getTime() < new Date(val.check_in).getTime()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["check_out"],
+          message: "Check-out must be on or after check-in",
+        });
+      }
+    }
+    if ((val.check_in && !val.check_out) || (!val.check_in && val.check_out)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["check_out"],
+        message: "Provide both check-in and check-out, or neither",
+      });
+    }
+    if (val.accommodation_id && (!val.check_in || !val.check_out)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["check_in"],
+        message: "Accommodation requires check-in and check-out dates",
+      });
+    }
+  });
 
 export default function BookingsPage() {
   const [bookings, setBookings] = useState<any[]>([]);
@@ -24,6 +86,8 @@ export default function BookingsPage() {
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ booking_type: "course", diver_id: "", group_id: "", course_id: "", accommodation_id: "", check_in: "", check_out: "", payment_status: "unpaid", notes: "" });
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
   const [selectedEquipment, setSelectedEquipment] = useState<Array<{ equipment_id: string; quantity: number }>>([]);
   const [rentalAssignmentsList, setRentalAssignmentsList] = useState<any[]>([]);
   const { toast } = useToast();
@@ -103,49 +167,47 @@ export default function BookingsPage() {
   };
 
   const handleSubmit = async () => {
-    if (!form.diver_id) {
-      toast({ title: "Error", description: "Diver is required", variant: "destructive" });
+    const parsed = bookingSchema.safeParse(form);
+    if (!parsed.success) {
+      const fieldErrors: Record<string, string> = {};
+      for (const issue of parsed.error.issues) {
+        const key = String(issue.path[0] ?? "form");
+        if (!fieldErrors[key]) fieldErrors[key] = issue.message;
+      }
+      setErrors(fieldErrors);
+      toast({
+        title: "Please fix the highlighted fields",
+        description: Object.values(fieldErrors)[0],
+        variant: "destructive",
+      });
       return;
     }
-
-    if (form.booking_type === "course" && !form.course_id) {
-      toast({ title: "Error", description: "Course is required for course booking", variant: "destructive" });
-      return;
-    }
-
-    if (form.booking_type === "fun_dive" && !form.group_id) {
-      toast({ title: "Error", description: "Group is required for fun dive booking", variant: "destructive" });
-      return;
-    }
-
+    setErrors({});
+    const values = parsed.data;
     const total = calcTotal();
+    setSubmitting(true);
     try {
       let bookingId = editingId;
-      
+
+      const payload = {
+        diver_id: values.diver_id,
+        course_id: values.booking_type === "course" ? values.course_id || null : null,
+        group_id: values.booking_type === "fun_dive" ? values.group_id || null : null,
+        accommodation_id: values.accommodation_id || null,
+        check_in: values.check_in || null,
+        check_out: values.check_out || null,
+        total_amount: total,
+        notes: values.notes || null,
+      };
+
       if (editingId) {
         await apiClient.bookings.update(editingId, {
-          diver_id: form.diver_id,
-          course_id: form.booking_type === "course" ? form.course_id : null,
-          group_id: form.booking_type === "fun_dive" ? form.group_id : null,
-          accommodation_id: form.accommodation_id || null,
-          check_in: form.check_in || null,
-          check_out: form.check_out || null,
-          total_amount: total,
-          payment_status: form.payment_status,
-          notes: form.notes || null,
+          ...payload,
+          payment_status: values.payment_status,
         });
         toast({ title: "Success", description: "Booking updated successfully" });
       } else {
-        const res = await apiClient.bookings.create({
-          diver_id: form.diver_id,
-          course_id: form.booking_type === "course" ? form.course_id : null,
-          group_id: form.booking_type === "fun_dive" ? form.group_id : null,
-          accommodation_id: form.accommodation_id || null,
-          check_in: form.check_in || null,
-          check_out: form.check_out || null,
-          total_amount: total,
-          notes: form.notes || null,
-        });
+        const res = await apiClient.bookings.create(payload);
         bookingId = res.id;
         toast({ title: "Success", description: "Booking created successfully" });
       }
@@ -157,8 +219,8 @@ export default function BookingsPage() {
             booking_id: bookingId,
             equipment_id: eq.equipment_id,
             quantity: eq.quantity,
-            check_in: form.check_in,
-            check_out: form.check_out,
+            check_in: values.check_in,
+            check_out: values.check_out,
           });
         }
         toast({ title: "Success", description: `${selectedEquipment.length} equipment items assigned` });
@@ -169,18 +231,21 @@ export default function BookingsPage() {
       load();
     } catch (err) {
       toast({ title: "Error", description: String(err), variant: "destructive" });
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const togglePayment = async (id: string, current: string) => {
-    const next = current === "paid" ? "unpaid" : "paid";
+  const updatePaymentStatus = async (id: string, next: PaymentStatus) => {
     try {
       await apiClient.bookings.update(id, { payment_status: next });
+      toast({ title: "Payment status updated", description: `Marked as ${next}` });
       load();
     } catch (err) {
       toast({ title: "Error", description: String(err), variant: "destructive" });
     }
   };
+
 
   const calculateNights = (checkIn: string, checkOut: string): number => {
     if (!checkIn || !checkOut) return 0;
@@ -253,8 +318,10 @@ export default function BookingsPage() {
   };
 
   const statusColors: Record<string, string> = {
-    paid: "bg-success/20 text-success border-success/30",
-    unpaid: "bg-destructive/20 text-destructive border-destructive/30",
+    paid: "bg-success/20 text-success border border-success/30",
+    partial: "bg-warning/20 text-warning border border-warning/30",
+    unpaid: "bg-destructive/20 text-destructive border border-destructive/30",
+    refunded: "bg-muted text-muted-foreground border border-border",
   };
 
   return (
@@ -305,30 +372,33 @@ export default function BookingsPage() {
               <div>
                 <Label>Diver *</Label>
                 <Select value={form.diver_id} onValueChange={(v) => setForm({ ...form, diver_id: v })}>
-                  <SelectTrigger><SelectValue placeholder="Select diver" /></SelectTrigger>
+                  <SelectTrigger aria-invalid={!!errors.diver_id}><SelectValue placeholder="Select diver" /></SelectTrigger>
                     <SelectContent className="z-50">{divers.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent>
                 </Select>
+                {errors.diver_id && <p className="text-sm text-destructive mt-1">{errors.diver_id}</p>}
               </div>
 
               {/* Course Selection - Only show for course bookings */}
               {form.booking_type === "course" && (
                 <div>
-                  <Label>Course</Label>
+                  <Label>Course *</Label>
                   <Select value={form.course_id} onValueChange={(v) => setForm({ ...form, course_id: v })}>
-                    <SelectTrigger><SelectValue placeholder="Select course (optional)" /></SelectTrigger>
+                    <SelectTrigger aria-invalid={!!errors.course_id}><SelectValue placeholder="Select course" /></SelectTrigger>
                       <SelectContent className="z-50">{courses.map((c) => <SelectItem key={c.id} value={c.id}>{c.name} (${c.price})</SelectItem>)}</SelectContent>
                   </Select>
+                  {errors.course_id && <p className="text-sm text-destructive mt-1">{errors.course_id}</p>}
                 </div>
               )}
 
               {/* Group Selection - Only show for fun dive bookings */}
               {form.booking_type === "fun_dive" && (
                 <div>
-                  <Label>Group</Label>
+                  <Label>Group *</Label>
                   <Select value={form.group_id} onValueChange={(v) => setForm({ ...form, group_id: v })}>
-                    <SelectTrigger><SelectValue placeholder="Select group (optional)" /></SelectTrigger>
+                    <SelectTrigger aria-invalid={!!errors.group_id}><SelectValue placeholder="Select group" /></SelectTrigger>
                     <SelectContent className="z-50">{groups.map((g) => <SelectItem key={g.id} value={g.id}>{g.name} ({g.days} days)</SelectItem>)}</SelectContent>
                   </Select>
+                  {errors.group_id && <p className="text-sm text-destructive mt-1">{errors.group_id}</p>}
                 </div>
               )}
 
@@ -342,11 +412,13 @@ export default function BookingsPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Check In</Label>
-                  <Input type="date" value={form.check_in} onChange={(e) => setForm({ ...form, check_in: e.target.value })} />
+                  <Input type="date" value={form.check_in} onChange={(e) => setForm({ ...form, check_in: e.target.value })} aria-invalid={!!errors.check_in} />
+                  {errors.check_in && <p className="text-sm text-destructive mt-1">{errors.check_in}</p>}
                 </div>
                 <div>
                   <Label>Check Out</Label>
-                  <Input type="date" value={form.check_out} onChange={(e) => setForm({ ...form, check_out: e.target.value })} />
+                  <Input type="date" value={form.check_out} onChange={(e) => setForm({ ...form, check_out: e.target.value })} aria-invalid={!!errors.check_out} min={form.check_in || undefined} />
+                  {errors.check_out && <p className="text-sm text-destructive mt-1">{errors.check_out}</p>}
                 </div>
               </div>
               {editingId && (
@@ -356,15 +428,19 @@ export default function BookingsPage() {
                     <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent className="z-50">
                         <SelectItem value="unpaid">Unpaid</SelectItem>
+                        <SelectItem value="partial">Partial</SelectItem>
                         <SelectItem value="paid">Paid</SelectItem>
+                        <SelectItem value="refunded">Refunded</SelectItem>
                       </SelectContent>
                   </Select>
                 </div>
               )}
               <div>
                 <Label>Notes</Label>
-                <Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+                <Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} maxLength={500} aria-invalid={!!errors.notes} />
+                {errors.notes && <p className="text-sm text-destructive mt-1">{errors.notes}</p>}
               </div>
+
 
               {/* Equipment Assignment */}
               <div className="border-t pt-4">
@@ -423,7 +499,7 @@ export default function BookingsPage() {
               </div>
               <div className="flex gap-2 justify-end">
                 <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-                <Button onClick={handleSubmit}>{editingId ? "Update" : "Create"}</Button>
+                <Button onClick={handleSubmit} disabled={submitting}>{submitting ? "Saving…" : editingId ? "Update" : "Create"}</Button>
               </div>
             </div>
           </DialogContent>
@@ -482,9 +558,24 @@ export default function BookingsPage() {
                   <td className="text-sm">{b.check_in || "—"} → {b.check_out || "—"}</td>
                   <td className="font-mono font-medium">${b.total_amount}</td>
                   <td>
-                    <Badge variant="outline" className={`cursor-pointer ${statusColors[b.payment_status]}`} onClick={() => togglePayment(b.id, b.payment_status)}>
-                      {b.payment_status}
-                    </Badge>
+                    <Select
+                      value={b.payment_status}
+                      onValueChange={(v) => updatePaymentStatus(b.id, v as PaymentStatus)}
+                    >
+                      <SelectTrigger
+                        className={`h-8 w-[120px] capitalize ${statusColors[b.payment_status] ?? ""}`}
+                        aria-label="Update payment status"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="z-50">
+                        {PAYMENT_STATUSES.map((s) => (
+                          <SelectItem key={s} value={s} className="capitalize">
+                            {s}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </td>
                   <td>
                     <div className="flex gap-1">
