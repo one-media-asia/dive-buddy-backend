@@ -167,49 +167,47 @@ export default function BookingsPage() {
   };
 
   const handleSubmit = async () => {
-    if (!form.diver_id) {
-      toast({ title: "Error", description: "Diver is required", variant: "destructive" });
+    const parsed = bookingSchema.safeParse(form);
+    if (!parsed.success) {
+      const fieldErrors: Record<string, string> = {};
+      for (const issue of parsed.error.issues) {
+        const key = String(issue.path[0] ?? "form");
+        if (!fieldErrors[key]) fieldErrors[key] = issue.message;
+      }
+      setErrors(fieldErrors);
+      toast({
+        title: "Please fix the highlighted fields",
+        description: Object.values(fieldErrors)[0],
+        variant: "destructive",
+      });
       return;
     }
-
-    if (form.booking_type === "course" && !form.course_id) {
-      toast({ title: "Error", description: "Course is required for course booking", variant: "destructive" });
-      return;
-    }
-
-    if (form.booking_type === "fun_dive" && !form.group_id) {
-      toast({ title: "Error", description: "Group is required for fun dive booking", variant: "destructive" });
-      return;
-    }
-
+    setErrors({});
+    const values = parsed.data;
     const total = calcTotal();
+    setSubmitting(true);
     try {
       let bookingId = editingId;
-      
+
+      const payload = {
+        diver_id: values.diver_id,
+        course_id: values.booking_type === "course" ? values.course_id || null : null,
+        group_id: values.booking_type === "fun_dive" ? values.group_id || null : null,
+        accommodation_id: values.accommodation_id || null,
+        check_in: values.check_in || null,
+        check_out: values.check_out || null,
+        total_amount: total,
+        notes: values.notes || null,
+      };
+
       if (editingId) {
         await apiClient.bookings.update(editingId, {
-          diver_id: form.diver_id,
-          course_id: form.booking_type === "course" ? form.course_id : null,
-          group_id: form.booking_type === "fun_dive" ? form.group_id : null,
-          accommodation_id: form.accommodation_id || null,
-          check_in: form.check_in || null,
-          check_out: form.check_out || null,
-          total_amount: total,
-          payment_status: form.payment_status,
-          notes: form.notes || null,
+          ...payload,
+          payment_status: values.payment_status,
         });
         toast({ title: "Success", description: "Booking updated successfully" });
       } else {
-        const res = await apiClient.bookings.create({
-          diver_id: form.diver_id,
-          course_id: form.booking_type === "course" ? form.course_id : null,
-          group_id: form.booking_type === "fun_dive" ? form.group_id : null,
-          accommodation_id: form.accommodation_id || null,
-          check_in: form.check_in || null,
-          check_out: form.check_out || null,
-          total_amount: total,
-          notes: form.notes || null,
-        });
+        const res = await apiClient.bookings.create(payload);
         bookingId = res.id;
         toast({ title: "Success", description: "Booking created successfully" });
       }
@@ -221,8 +219,8 @@ export default function BookingsPage() {
             booking_id: bookingId,
             equipment_id: eq.equipment_id,
             quantity: eq.quantity,
-            check_in: form.check_in,
-            check_out: form.check_out,
+            check_in: values.check_in,
+            check_out: values.check_out,
           });
         }
         toast({ title: "Success", description: `${selectedEquipment.length} equipment items assigned` });
@@ -233,18 +231,21 @@ export default function BookingsPage() {
       load();
     } catch (err) {
       toast({ title: "Error", description: String(err), variant: "destructive" });
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const togglePayment = async (id: string, current: string) => {
-    const next = current === "paid" ? "unpaid" : "paid";
+  const updatePaymentStatus = async (id: string, next: PaymentStatus) => {
     try {
       await apiClient.bookings.update(id, { payment_status: next });
+      toast({ title: "Payment status updated", description: `Marked as ${next}` });
       load();
     } catch (err) {
       toast({ title: "Error", description: String(err), variant: "destructive" });
     }
   };
+
 
   const calculateNights = (checkIn: string, checkOut: string): number => {
     if (!checkIn || !checkOut) return 0;
