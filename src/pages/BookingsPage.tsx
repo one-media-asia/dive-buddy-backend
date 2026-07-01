@@ -551,9 +551,24 @@ export default function BookingsPage() {
                   <td className="text-sm">{b.check_in || "—"} → {b.check_out || "—"}</td>
                   <td className="font-mono font-medium">${b.total_amount}</td>
                   <td>
-                    <Badge variant="outline" className={`cursor-pointer ${statusColors[b.payment_status]}`} onClick={() => togglePayment(b.id, b.payment_status)}>
-                      {b.payment_status}
-                    </Badge>
+                    <Select
+                      value={b.payment_status}
+                      onValueChange={(v) => updatePaymentStatus(b.id, v as PaymentStatus)}
+                    >
+                      <SelectTrigger
+                        className={`h-8 w-[120px] capitalize ${statusColors[b.payment_status] ?? ""}`}
+                        aria-label="Update payment status"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="z-50">
+                        {PAYMENT_STATUSES.map((s) => (
+                          <SelectItem key={s} value={s} className="capitalize">
+                            {s}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </td>
                   <td>
                     <div className="flex gap-1">
