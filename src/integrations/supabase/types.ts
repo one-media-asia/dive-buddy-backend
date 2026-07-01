@@ -311,6 +311,7 @@ export type Database = {
           name: string
           skill_level: string
           total_dives: number
+          user_id: string | null
         }
         Insert: {
           certification?: string | null
@@ -323,6 +324,7 @@ export type Database = {
           name: string
           skill_level?: string
           total_dives?: number
+          user_id?: string | null
         }
         Update: {
           certification?: string | null
@@ -335,6 +337,7 @@ export type Database = {
           name?: string
           skill_level?: string
           total_dives?: number
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -664,6 +667,27 @@ export type Database = {
           },
         ]
       }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       waivers: {
         Row: {
           created_at: string
@@ -711,6 +735,7 @@ export type Database = {
     }
     Enums: {
       accommodation_tier: "free_with_course" | "standard" | "deluxe"
+      app_role: "admin" | "staff"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -839,6 +864,7 @@ export const Constants = {
   public: {
     Enums: {
       accommodation_tier: ["free_with_course", "standard", "deluxe"],
+      app_role: ["admin", "staff"],
     },
   },
 } as const

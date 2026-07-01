@@ -38,10 +38,13 @@ export function useWaiver() {
 
       const path = `waivers/${diverId ?? 'unknown'}/${Date.now()}.pdf`;
       const { error: uploadErr } = await supabase.storage.from('waivers').upload(path, pdfBlob as Blob, { upsert: true });
+      // Bucket is private; issue a short-lived signed URL instead of a public URL.
       let publicUrl: string | null = null;
       if (!uploadErr) {
-        const { data: urlData } = supabase.storage.from('waivers').getPublicUrl(path);
-        publicUrl = urlData.publicUrl ?? null;
+        const { data: urlData } = await supabase.storage
+          .from('waivers')
+          .createSignedUrl(path, 60 * 60); // 1 hour
+        publicUrl = urlData?.signedUrl ?? null;
       }
 
       const { error: wErr } = await sb.from('waivers').insert([{ diver_id: diverId, form_data: values, signature_image_url: signatureDataUrl, pdf_url: publicUrl }]);
