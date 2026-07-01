@@ -1,16 +1,78 @@
 import { useState, useEffect } from "react";
+import { z } from "zod";
 import { Plus, Trash2, Edit2, FileText, Download, Printer, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/integrations/api/client";
 import { generateInvoicePDF, printInvoice } from "@/utils/invoiceGenerator";
 import { equipment, rentalAssignments } from "@/hooks/usePOS";
+
+const PAYMENT_STATUSES = ["unpaid", "partial", "paid", "refunded"] as const;
+type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
+
+// Accepts empty string or an ISO-ish YYYY-MM-DD date. Empty string means "no date".
+const dateOrEmpty = z
+  .string()
+  .refine((v) => v === "" || !Number.isNaN(new Date(v).getTime()), {
+    message: "Invalid date",
+  });
+
+const bookingSchema = z
+  .object({
+    booking_type: z.enum(["course", "fun_dive"]),
+    diver_id: z.string().uuid({ message: "Diver is required" }),
+    group_id: z.string().uuid().or(z.literal("")),
+    course_id: z.string().uuid().or(z.literal("")),
+    accommodation_id: z.string().uuid().or(z.literal("")),
+    check_in: dateOrEmpty,
+    check_out: dateOrEmpty,
+    payment_status: z.enum(PAYMENT_STATUSES),
+    notes: z.string().max(500, { message: "Notes must be under 500 characters" }),
+  })
+  .superRefine((val, ctx) => {
+    if (val.booking_type === "course" && !val.course_id) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["course_id"],
+        message: "Course is required for a course booking",
+      });
+    }
+    if (val.booking_type === "fun_dive" && !val.group_id) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["group_id"],
+        message: "Group is required for a fun dive booking",
+      });
+    }
+    if (val.check_in && val.check_out) {
+      if (new Date(val.check_out).getTime() < new Date(val.check_in).getTime()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["check_out"],
+          message: "Check-out must be on or after check-in",
+        });
+      }
+    }
+    if ((val.check_in && !val.check_out) || (!val.check_in && val.check_out)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["check_out"],
+        message: "Provide both check-in and check-out, or neither",
+      });
+    }
+    if (val.accommodation_id && (!val.check_in || !val.check_out)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["check_in"],
+        message: "Accommodation requires check-in and check-out dates",
+      });
+    }
+  });
 
 export default function BookingsPage() {
   const [bookings, setBookings] = useState<any[]>([]);
