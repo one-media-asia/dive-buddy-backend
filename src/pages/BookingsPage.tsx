@@ -372,30 +372,33 @@ export default function BookingsPage() {
               <div>
                 <Label>Diver *</Label>
                 <Select value={form.diver_id} onValueChange={(v) => setForm({ ...form, diver_id: v })}>
-                  <SelectTrigger><SelectValue placeholder="Select diver" /></SelectTrigger>
+                  <SelectTrigger aria-invalid={!!errors.diver_id}><SelectValue placeholder="Select diver" /></SelectTrigger>
                     <SelectContent className="z-50">{divers.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent>
                 </Select>
+                {errors.diver_id && <p className="text-sm text-destructive mt-1">{errors.diver_id}</p>}
               </div>
 
               {/* Course Selection - Only show for course bookings */}
               {form.booking_type === "course" && (
                 <div>
-                  <Label>Course</Label>
+                  <Label>Course *</Label>
                   <Select value={form.course_id} onValueChange={(v) => setForm({ ...form, course_id: v })}>
-                    <SelectTrigger><SelectValue placeholder="Select course (optional)" /></SelectTrigger>
+                    <SelectTrigger aria-invalid={!!errors.course_id}><SelectValue placeholder="Select course" /></SelectTrigger>
                       <SelectContent className="z-50">{courses.map((c) => <SelectItem key={c.id} value={c.id}>{c.name} (${c.price})</SelectItem>)}</SelectContent>
                   </Select>
+                  {errors.course_id && <p className="text-sm text-destructive mt-1">{errors.course_id}</p>}
                 </div>
               )}
 
               {/* Group Selection - Only show for fun dive bookings */}
               {form.booking_type === "fun_dive" && (
                 <div>
-                  <Label>Group</Label>
+                  <Label>Group *</Label>
                   <Select value={form.group_id} onValueChange={(v) => setForm({ ...form, group_id: v })}>
-                    <SelectTrigger><SelectValue placeholder="Select group (optional)" /></SelectTrigger>
+                    <SelectTrigger aria-invalid={!!errors.group_id}><SelectValue placeholder="Select group" /></SelectTrigger>
                     <SelectContent className="z-50">{groups.map((g) => <SelectItem key={g.id} value={g.id}>{g.name} ({g.days} days)</SelectItem>)}</SelectContent>
                   </Select>
+                  {errors.group_id && <p className="text-sm text-destructive mt-1">{errors.group_id}</p>}
                 </div>
               )}
 
@@ -409,11 +412,13 @@ export default function BookingsPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Check In</Label>
-                  <Input type="date" value={form.check_in} onChange={(e) => setForm({ ...form, check_in: e.target.value })} />
+                  <Input type="date" value={form.check_in} onChange={(e) => setForm({ ...form, check_in: e.target.value })} aria-invalid={!!errors.check_in} />
+                  {errors.check_in && <p className="text-sm text-destructive mt-1">{errors.check_in}</p>}
                 </div>
                 <div>
                   <Label>Check Out</Label>
-                  <Input type="date" value={form.check_out} onChange={(e) => setForm({ ...form, check_out: e.target.value })} />
+                  <Input type="date" value={form.check_out} onChange={(e) => setForm({ ...form, check_out: e.target.value })} aria-invalid={!!errors.check_out} min={form.check_in || undefined} />
+                  {errors.check_out && <p className="text-sm text-destructive mt-1">{errors.check_out}</p>}
                 </div>
               </div>
               {editingId && (
@@ -432,8 +437,10 @@ export default function BookingsPage() {
               )}
               <div>
                 <Label>Notes</Label>
-                <Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+                <Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} maxLength={500} aria-invalid={!!errors.notes} />
+                {errors.notes && <p className="text-sm text-destructive mt-1">{errors.notes}</p>}
               </div>
+
 
               {/* Equipment Assignment */}
               <div className="border-t pt-4">
