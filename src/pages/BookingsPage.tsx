@@ -318,8 +318,10 @@ export default function BookingsPage() {
   };
 
   const statusColors: Record<string, string> = {
-    paid: "bg-success/20 text-success border-success/30",
-    unpaid: "bg-destructive/20 text-destructive border-destructive/30",
+    paid: "bg-success/20 text-success border border-success/30",
+    partial: "bg-warning/20 text-warning border border-warning/30",
+    unpaid: "bg-destructive/20 text-destructive border border-destructive/30",
+    refunded: "bg-muted text-muted-foreground border border-border",
   };
 
   return (
